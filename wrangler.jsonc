@@ -1,0 +1,25 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "pintapost",
+
+  // Actualizar a la fecha del día en que se cree el proyecto.
+  "compatibility_date": "2026-08-29",
+
+  // ETAPA 1: no hay campo "main". Sin Worker, sin cómputo, sin invocaciones.
+  // En la Etapa 2 se añadirá:
+  //   "main": "./worker/index.js",
+  //   "assets": { ..., "run_worker_first": ["/api/*"] }
+  // run_worker_first limitado a /api/* es lo que evita que servir el HTML
+  // consuma invocaciones del plan gratuito.
+
+  "assets": {
+    "directory": "./",
+    "not_found_handling": "404-page"
+  },
+
+  "observability": {
+    "enabled": true
+  },
+
+  "preview_urls": true
+}

@@ -1,0 +1,20 @@
+# Archivos que NO deben publicarse como assets estáticos en Cloudflare.
+# A diferencia de Pages, Workers no excluye nada automáticamente (ADR-001).
+
+node_modules
+.git
+.gitignore
+.idea
+.DS_Store
+_workspace
+worker
+tests
+package.json
+pnpm-lock.yaml
+tailwind.config.js
+wrangler.jsonc
+CLAUDE.md
+README.md
+
+# El CSS de entrada no se sirve: solo su compilado tailwind.css
+static/css/styles.css

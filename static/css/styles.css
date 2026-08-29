@@ -1,0 +1,220 @@
+/* =========================================================================
+   PintaPost — Hoja de estilos de entrada
+   -------------------------------------------------------------------------
+   ARCHIVO FUENTE. Se compila a static/css/tailwind.css.
+   Nunca enlaces este archivo desde el HTML ni edites tailwind.css a mano.
+
+   Compilar:  pnpm run build
+   Watch:     pnpm run dev
+   ========================================================================= */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =========================================================================
+   1. TOKENS DE COLOR  (ADR-011)
+   -------------------------------------------------------------------------
+   Los valores son canales RGB separados por espacios, sin la función rgb().
+   Ese formato es el que permite que tailwind.config.js los envuelva en
+   "rgb(var(--x) / <alpha-value>)" y que sigan funcionando las utilidades de
+   opacidad como bg-primary/50 o border-outline-variant/30.
+
+   El comentario a la derecha es el hex original del prototipo, para poder
+   verificar la migración de un vistazo.
+   ========================================================================= */
+
+/* NOTA IMPORTANTE: estos bloques van FUERA de @layer base a propósito.
+   Tailwind v3 elimina del layer base las reglas cuyo selector contiene una
+   clase que no aparece en el HTML. Como ".dark" no está escrita en el
+   marcado (la añade el JS en tiempo de ejecución), dentro de @layer base
+   el tema oscuro desaparecería del CSS compilado. Fuera de @layer, nunca
+   se purga. */
+
+:root {
+    /* --- Primario ------------------------------------------------------ */
+  --primary:                     0 74 198;      /* #004ac6 */
+  --on-primary:                  255 255 255;   /* #ffffff */
+  --primary-container:           37 99 235;     /* #2563eb */
+  --on-primary-container:        238 239 255;   /* #eeefff */
+  --primary-fixed:               219 225 255;   /* #dbe1ff */
+  --primary-fixed-dim:           180 197 255;   /* #b4c5ff */
+  --on-primary-fixed:            0 23 75;       /* #00174b */
+  --on-primary-fixed-variant:    0 62 168;      /* #003ea8 */
+  --inverse-primary:             180 197 255;   /* #b4c5ff */
+
+    /* --- Secundario ---------------------------------------------------- */
+  --secondary:                   75 65 225;     /* #4b41e1 */
+  --on-secondary:                255 255 255;   /* #ffffff */
+  --secondary-container:         100 94 251;    /* #645efb */
+  --on-secondary-container:      255 251 255;   /* #fffbff */
+  --secondary-fixed:             226 223 255;   /* #e2dfff */
+  --secondary-fixed-dim:         195 192 255;   /* #c3c0ff */
+  --on-secondary-fixed:          15 0 105;      /* #0f0069 */
+  --on-secondary-fixed-variant:  51 35 204;     /* #3323cc */
+
+    /* --- Terciario ----------------------------------------------------- */
+  --tertiary:                    77 85 107;     /* #4d556b */
+  --on-tertiary:                 255 255 255;   /* #ffffff */
+  --tertiary-container:          101 109 132;   /* #656d84 */
+  --on-tertiary-container:       238 240 255;   /* #eef0ff */
+  --tertiary-fixed:              218 226 253;   /* #dae2fd */
+  --tertiary-fixed-dim:          190 198 224;   /* #bec6e0 */
+  --on-tertiary-fixed:           19 27 46;      /* #131b2e */
+  --on-tertiary-fixed-variant:   63 70 92;      /* #3f465c */
+
+    /* --- Error --------------------------------------------------------- */
+  --error:                       186 26 26;     /* #ba1a1a */
+  --on-error:                    255 255 255;   /* #ffffff */
+  --error-container:             255 218 214;   /* #ffdad6 */
+  --on-error-container:          147 0 10;      /* #93000a */
+
+    /* --- Superficies --------------------------------------------------- */
+  --background:                  248 249 255;   /* #f8f9ff */
+  --on-background:               11 28 48;      /* #0b1c30 */
+  --surface:                     248 249 255;   /* #f8f9ff */
+  --on-surface:                  11 28 48;      /* #0b1c30 */
+  --surface-variant:             211 228 254;   /* #d3e4fe */
+  --on-surface-variant:          67 70 85;      /* #434655 */
+  --surface-dim:                 203 219 245;   /* #cbdbf5 */
+  --surface-bright:              248 249 255;   /* #f8f9ff */
+  --surface-container-lowest:    255 255 255;   /* #ffffff */
+  --surface-container-low:       239 244 255;   /* #eff4ff */
+  --surface-container:           229 238 255;   /* #e5eeff */
+  --surface-container-high:      220 233 255;   /* #dce9ff */
+  --surface-container-highest:   211 228 254;   /* #d3e4fe */
+  --surface-tint:                0 83 219;      /* #0053db */
+  --inverse-surface:             33 49 69;      /* #213145 */
+  --inverse-on-surface:          234 241 255;   /* #eaf1ff */
+
+    /* --- Contornos ----------------------------------------------------- */
+  --outline:                     115 118 134;   /* #737686 */
+  --outline-variant:             195 198 215;   /* #c3c6d7 */
+
+    /* --- Sombra de tarjeta (se usaba inline en el prototipo) ----------- */
+  --shadow-card: 0 4px 12px rgb(15 23 42 / 0.05);
+}
+
+  /* =======================================================================
+     TEMA OSCURO
+     -----------------------------------------------------------------------
+     Derivado del esquema claro siguiendo Material 3: se intercambian los
+     roles surface/on-surface, los acentos suben en luminosidad y los
+     contenedores bajan. Los roles "fixed" NO cambian entre temas: ese es su
+     propósito en M3 (mantener un color constante en ambos modos).
+
+     ⚠️ PENDIENTE: verificar contraste AA (4.5:1 texto normal, 3:1 texto
+     grande y elementos de interfaz) antes de cerrar el sprint S02.
+     ======================================================================= */
+.dark {
+    /* --- Primario ------------------------------------------------------ */
+  --primary:                     180 197 255;   /* #b4c5ff */
+  --on-primary:                  0 45 122;      /* #002d7a */
+  --primary-container:           0 62 168;      /* #003ea8 */
+  --on-primary-container:        219 225 255;   /* #dbe1ff */
+  --inverse-primary:             0 74 198;      /* #004ac6 */
+
+    /* --- Secundario ---------------------------------------------------- */
+  --secondary:                   195 192 255;   /* #c3c0ff */
+  --on-secondary:                28 0 158;      /* #1c009e */
+  --secondary-container:         51 35 204;     /* #3323cc */
+  --on-secondary-container:      226 223 255;   /* #e2dfff */
+
+    /* --- Terciario ----------------------------------------------------- */
+  --tertiary:                    190 198 224;   /* #bec6e0 */
+  --on-tertiary:                 40 48 69;      /* #283045 */
+  --tertiary-container:          63 70 92;      /* #3f465c */
+  --on-tertiary-container:       218 226 253;   /* #dae2fd */
+
+    /* --- Error --------------------------------------------------------- */
+  --error:                       255 180 171;   /* #ffb4ab */
+  --on-error:                    105 0 5;       /* #690005 */
+  --error-container:             147 0 10;      /* #93000a */
+  --on-error-container:          255 218 214;   /* #ffdad6 */
+
+    /* --- Superficies --------------------------------------------------- */
+  --background:                  11 20 32;      /* #0b1420 */
+  --on-background:               225 233 245;   /* #e1e9f5 */
+  --surface:                     11 20 32;      /* #0b1420 */
+  --on-surface:                  225 233 245;   /* #e1e9f5 */
+  --surface-variant:             67 70 85;      /* #434655 */
+  --on-surface-variant:          195 198 215;   /* #c3c6d7 */
+  --surface-dim:                 11 20 32;      /* #0b1420 */
+  --surface-bright:              48 56 69;      /* #303845 */
+  --surface-container-lowest:    6 13 22;       /* #060d16 */
+  --surface-container-low:       19 28 40;      /* #131c28 */
+  --surface-container:           23 32 44;      /* #17202c */
+  --surface-container-high:      34 43 55;      /* #222b37 */
+  --surface-container-highest:   44 54 66;      /* #2c3642 */
+  --surface-tint:                180 197 255;   /* #b4c5ff */
+  --inverse-surface:             225 233 245;   /* #e1e9f5 */
+  --inverse-on-surface:          33 49 69;      /* #213145 */
+
+    /* --- Contornos ----------------------------------------------------- */
+  --outline:                     141 144 160;   /* #8d90a0 */
+  --outline-variant:             67 70 85;      /* #434655 */
+
+    /* --- Sombra: en oscuro las sombras se ven mal; se refuerza --------- */
+  --shadow-card: 0 4px 12px rgb(0 0 0 / 0.35);
+}
+
+/* =========================================================================
+   2. ESTILOS BASE
+   ========================================================================= */
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  @apply bg-background text-on-background antialiased;
+}
+
+/* Foco visible y coherente en toda la aplicación. Necesario para la
+   navegación por teclado (H-13). */
+:focus-visible {
+  @apply outline-none ring-2 ring-primary ring-offset-2 ring-offset-surface;
+}
+
+/* =========================================================================
+   3. COMPONENTES
+   ========================================================================= */
+
+/* Reemplaza el style="box-shadow: ..." inline que traía el prototipo. */
+.card {
+  @apply rounded-xl border border-outline-variant/30 bg-surface-container-lowest;
+  box-shadow: var(--shadow-card);
+}
+
+/* =========================================================================
+   4. UTILIDADES
+   ========================================================================= */
+
+/* La barra de herramientas hace scroll horizontal en móvil sin mostrar
+     la barra del navegador. El prototipo usaba .no-scrollbar sin definirla. */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Respeta el área segura de los dispositivos con notch. */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* =========================================================================
+   5. PLACEHOLDER DEL EDITOR  (corrige H-12)
+   -------------------------------------------------------------------------
+   El prototipo usaba [contenteditable]:empty:before, que deja de aplicar en
+   cuanto el navegador inserta un <br> residual tras escribir y borrar. Se
+   sustituye por una clase que el JS alterna comprobando textContent.
+   ========================================================================= */
+
+[contenteditable="true"].is-empty::before {
+  content: attr(data-placeholder);
+  @apply pointer-events-none block text-outline;
+}
