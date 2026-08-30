@@ -8,14 +8,16 @@ caracteres Unicode matemáticos. Estático, gratuito, sin login, sin base de dat
 - HTML5 semántico
 - Tailwind CSS v3 compilado con la CLI. **Nunca el Play CDN.**
 - Gestor de paquetes: **pnpm**. Nunca npm ni yarn.
-- CSS: entrada en `static/css/styles.css`, salida en `static/css/tailwind.css`. 
-- Nunca editar el archivo de salida.
-- Todo el CSS vive en `static/css/styles.css`. Los `.html` solo llevan clases:
-  prohibido `<style>` y el atributo `style=` inline (ADR-015).
+- CSS: entrada en `public/static/css/styles.css`, salida en
+  `public/static/css/tailwind.css`. Nunca editar el archivo de salida.
+- Todo el CSS vive en `public/static/css/styles.css`. Los `.html` solo llevan
+  clases: prohibido `<style>` y el atributo `style=` inline (ADR-015).
 - JavaScript ES6+ nativo. **Cero dependencias de runtime.**
 - Dependencias de desarrollo permitidas: tailwindcss, esbuild, wrangler.
 - Tests con el runner nativo de Node (`node --test`). Sin Jest ni Vitest.
 - Despliegue: Cloudflare Workers + Static Assets. **No Pages.**
+- Todo lo publicable vive en `public/`, el directorio de assets. Lo que esté
+  fuera de `public/` no se publica jamás. (ADR-016)
 
 ## Documentación de trabajo
 
@@ -48,7 +50,7 @@ futuros ni épicas ya completadas: gastan contexto y arrastran suposiciones viej
 - Los mapeos Unicode usan los bloques **Sans-Serif** (U+1D5D4 / U+1D5EE /
   U+1D608 / U+1D622), no los Serif.
 - Los hashtags (`#`) y menciones (`@`) nunca reciben formato Unicode.
-- Todo el CSS se centraliza en `static/css/styles.css`. Ningún archivo `.html`
+- Todo el CSS se centraliza en `public/static/css/styles.css`. Ningún `.html`
   contiene `<style>` ni atributos `style=` inline; lo que no encaje en una
   utilidad de Tailwind se declara como componente o utilidad en `styles.css`.
   Única excepción: el script de tema puede fijar propiedades vía JS en runtime

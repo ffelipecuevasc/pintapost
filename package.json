@@ -5,12 +5,12 @@
   "type": "module",
   "description": "Editor enriquecido para publicaciones de LinkedIn",
   "scripts": {
-    "build:css": "tailwindcss -i ./static/css/styles.css -o ./static/css/tailwind.css --minify",
-    "watch:css": "tailwindcss -i ./static/css/styles.css -o ./static/css/tailwind.css --watch",
+    "build:css": "tailwindcss -i ./public/static/css/styles.css -o ./public/static/css/tailwind.css --minify",
+    "watch:css": "tailwindcss -i ./public/static/css/styles.css -o ./public/static/css/tailwind.css --watch",
     "build": "pnpm run build:css",
     "dev": "pnpm run watch:css",
     "preview": "wrangler dev",
-    "clean": "node -e \"import('node:fs').then(fs=>fs.rmSync('static/css/tailwind.css',{force:true}))\""
+    "clean": "node -e \"import('node:fs').then(fs=>fs.rmSync('public/static/css/tailwind.css',{force:true}))\""
   },
   "devDependencies": {
     "@tailwindcss/forms": "^0.5.10",

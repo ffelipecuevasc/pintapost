@@ -8,8 +8,7 @@ export default {
   // Si añades carpetas nuevas con HTML o JS, agrégalas aquí o sus
   // clases no aparecerán en el CSS compilado.
   content: [
-    "./index.html",
-    "./static/**/*.{html,js}",
+    "./public/**/*.{html,js}",
   ],
 
   theme: {

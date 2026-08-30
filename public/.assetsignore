@@ -1,0 +1,6 @@
+# Archivos que NO deben publicarse como assets estáticos en Cloudflare.
+# Las rutas son relativas al directorio de assets (./public), no a la raíz
+# del repositorio: aquí dentro solo vive lo publicable (ADR-016).
+
+# El CSS de entrada no se sirve: solo su compilado tailwind.css
+static/css/styles.css

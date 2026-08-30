@@ -24,7 +24,7 @@ yarn-debug.log
 *.iws
 *.ipr
 out/
-static/css/tailwind.css
+public/static/css/tailwind.css
 
 # Estado local de Wrangler (generado por `wrangler dev`)
 .wrangler/
