@@ -3,6 +3,7 @@
 
 node_modules
 .git
+.wrangler
 .gitignore
 .idea
 .DS_Store

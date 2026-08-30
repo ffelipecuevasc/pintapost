@@ -10,6 +10,8 @@ caracteres Unicode matemáticos. Estático, gratuito, sin login, sin base de dat
 - Gestor de paquetes: **pnpm**. Nunca npm ni yarn.
 - CSS: entrada en `static/css/styles.css`, salida en `static/css/tailwind.css`. 
 - Nunca editar el archivo de salida.
+- Todo el CSS vive en `static/css/styles.css`. Los `.html` solo llevan clases:
+  prohibido `<style>` y el atributo `style=` inline (ADR-015).
 - JavaScript ES6+ nativo. **Cero dependencias de runtime.**
 - Dependencias de desarrollo permitidas: tailwindcss, esbuild, wrangler.
 - Tests con el runner nativo de Node (`node --test`). Sin Jest ni Vitest.
@@ -46,6 +48,11 @@ futuros ni épicas ya completadas: gastan contexto y arrastran suposiciones viej
 - Los mapeos Unicode usan los bloques **Sans-Serif** (U+1D5D4 / U+1D5EE /
   U+1D608 / U+1D622), no los Serif.
 - Los hashtags (`#`) y menciones (`@`) nunca reciben formato Unicode.
+- Todo el CSS se centraliza en `static/css/styles.css`. Ningún archivo `.html`
+  contiene `<style>` ni atributos `style=` inline; lo que no encaje en una
+  utilidad de Tailwind se declara como componente o utilidad en `styles.css`.
+  Única excepción: el script de tema puede fijar propiedades vía JS en runtime
+  para evitar el destello en modo oscuro. (ADR-015)
 
 ## Convenciones de código
 

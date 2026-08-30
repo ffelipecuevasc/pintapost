@@ -11,9 +11,7 @@
           rel="stylesheet"/>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
           rel="stylesheet"/>
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
-          rel="stylesheet"/>
-    <link rel="stylesheet" href="./static/css/tailwind.css">
+    <link rel="stylesheet" href="/static/css/tailwind.css">
     <style>
         .material-symbols-outlined {
             font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
@@ -21,13 +19,6 @@
 
         .icon-fill {
             font-variation-settings: 'FILL' 1;
-        }
-
-        [contenteditable="true"]:empty:before {
-            content: attr(placeholder);
-            pointer-events: none;
-            display: block;
-            color: #737686; /* outline color */
         }
     </style>
 </head>
@@ -113,8 +104,7 @@
         <div class="w-full max-w-[720px] flex flex-col gap-6">
             <!-- AI Generator Section -->
             <section
-                    class="bg-surface-container-lowest rounded-xl p-6 shadow-sm border border-outline-variant/20 flex flex-col sm:flex-row gap-4 items-center justify-between"
-                    style="box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);">
+                    class="card p-6 flex flex-col sm:flex-row gap-4 items-center justify-between">
                 <div class="flex-1 w-full">
                     <h3 class="text-body-md font-body-md font-semibold text-on-surface mb-2">Generador de Ideas IA</h3>
                     <div class="relative">
@@ -134,8 +124,7 @@
             </section>
             <!-- LinkedIn Editor Card -->
             <section
-                    class="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant/30 flex flex-col"
-                    style="box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);">
+                    class="card flex flex-col">
                 <!-- Editor Toolbar -->
                 <div class="flex items-center gap-2 p-3 border-b border-outline-variant/30 bg-surface-bright rounded-t-xl overflow-x-auto no-scrollbar">
                     <button class="p-2 text-on-surface-variant hover:text-primary hover:bg-surface-container rounded transition-colors"
@@ -216,5 +205,6 @@
         <span class="font-label-sm text-label-sm">Settings</span>
     </a>
 </nav>
+<script type="module" src="/static/js/main.js" defer></script>
 </body>
 </html>
