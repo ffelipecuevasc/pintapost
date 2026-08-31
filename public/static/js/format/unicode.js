@@ -22,6 +22,26 @@
  * 5. Si el estilo lleva subrayado o tachado, añadir su marca combinable al
  *    final del grafema completo.
  *
+ * ── Estricto al escribir, tolerante al leer ────────────────────────────────
+ *
+ * `toStyled` y `stripStyling` no son simétricas, y es deliberado.
+ *
+ * `toStyled` es **estricta**: produce sans-serif y nada más (ADR-004), en las
+ * combinaciones que ofrece la interfaz. Es la única salida del motor y define
+ * lo que este producto pone en el portapapeles.
+ *
+ * `stripStyling` es **tolerante**: reconoce las catorce familias del bloque
+ * matemático —serif, script, fraktur, doble raya, monoespaciada— y los
+ * sustitutos de Letterlike Symbols, aunque el motor no genere ninguna de ellas.
+ *
+ * No es generosidad. Casi todos los formateadores de LinkedIn usan el bloque
+ * serif, así que el texto que el usuario pega viene de ahí. En el S04
+ * `stripStyling` será lo que normalice ese pegado antes de que entre al modelo;
+ * si solo reconociera lo que produce `toStyled`, los caracteres matemáticos
+ * ajenos entrarían intactos en `{ text, ranges }`, que es exactamente lo que
+ * ADR-003 prohíbe. Una función que solo sabe deshacer lo que ella misma hizo no
+ * sirve para limpiar lo que llega de fuera.
+ *
  * ── Por qué NFD y no una tabla de letras base ──────────────────────────────
  *
  * El bloque matemático no define ninguna letra acentuada y nunca lo hará, así
@@ -47,7 +67,7 @@
 
 "use strict";
 
-import { ASCII, BLOCKS, COMBINING, RANGE_LENGTH } from "./blocks.js";
+import { ASCII, BLOCKS, COMBINING } from "./blocks.js";
 
 /** U+200D ZERO WIDTH JOINER: el pegamento de los emojis compuestos. */
 const ZWJ = 0x200d;
@@ -274,47 +294,93 @@ export function toStyled(text, style = {}) {
 }
 
 /**
- * Deshace la fórmula: dado un codepoint de cualquiera de los bloques, devuelve
- * su equivalente ASCII. `null` si no pertenece a ninguno.
+ * Rango completo del bloque *Mathematical Alphanumeric Symbols*.
+ *
+ * Cubre las catorce familias que Unicode define ahí —serif, sans-serif,
+ * script, fraktur, doble raya, monoespaciada y sus variantes en negrita y
+ * cursiva—, no solo las tres que produce `toStyled`. Los tres bloques del
+ * proyecto (ADR-004) viven dentro de este rango, así que no hace falta un
+ * inverso propio para ellos.
  */
-function unshiftToAscii(codepoint) {
-  for (const block of Object.values(BLOCKS)) {
-    if (
-      codepoint >= block.upper &&
-      codepoint < block.upper + RANGE_LENGTH.LETTERS
-    ) {
-      return String.fromCodePoint(ASCII.UPPER_A + codepoint - block.upper);
-    }
+const MATH_FIRST = 0x1d400;
+const MATH_LAST = 0x1d7ff;
 
-    if (
-      codepoint >= block.lower &&
-      codepoint < block.lower + RANGE_LENGTH.LETTERS
-    ) {
-      return String.fromCodePoint(ASCII.LOWER_A + codepoint - block.lower);
-    }
+/**
+ * Los 24 caracteres de *Letterlike Symbols* que rellenan los huecos reservados
+ * del bloque matemático.
+ *
+ * Unicode dejó 28 posiciones sin asignar dentro de U+1D400–U+1D7FF porque esas
+ * letras ya existían desde antes en otro sitio: la ℎ de la constante de Planck
+ * (U+210E), la ℬ del script, la ℭ del fraktur, la ℝ de los números reales…
+ * Cualquier herramienta que genere script o fraktur por fórmula tiene que
+ * sustituirlas por estas, así que el texto pegado desde fuera las traerá
+ * mezcladas con el bloque matemático y hay que limpiarlas igual.
+ *
+ * Van comentadas con su equivalente ASCII y su familia: los glifos son casi
+ * imposibles de distinguir de una letra normal en un editor de código.
+ */
+const LETTERLIKE_SUBSTITUTES = new Set([
+  0x2102, // ℂ → C   doble raya
+  0x210a, // ℊ → g   script
+  0x210b, // ℋ → H   script
+  0x210c, // ℌ → H   fraktur
+  0x210d, // ℍ → H   doble raya
+  0x210e, // ℎ → h   cursiva (constante de Planck)
+  0x2110, // ℐ → I   script
+  0x2111, // ℑ → I   fraktur
+  0x2112, // ℒ → L   script
+  0x2115, // ℕ → N   doble raya
+  0x2119, // ℙ → P   doble raya
+  0x211a, // ℚ → Q   doble raya
+  0x211b, // ℛ → R   script
+  0x211c, // ℜ → R   fraktur
+  0x211d, // ℝ → R   doble raya
+  0x2124, // ℤ → Z   doble raya
+  0x2128, // ℨ → Z   fraktur
+  0x212c, // ℬ → B   script
+  0x212d, // ℭ → C   fraktur
+  0x212f, // ℯ → e   script
+  0x2130, // ℰ → E   script
+  0x2131, // ℱ → F   script
+  0x2133, // ℳ → M   script
+  0x2134, // ℴ → o   script
+]);
 
-    if (
-      block.digits !== null &&
-      codepoint >= block.digits &&
-      codepoint < block.digits + RANGE_LENGTH.DIGITS
-    ) {
-      return String.fromCodePoint(ASCII.DIGIT_0 + codepoint - block.digits);
-    }
-  }
-
-  return null;
+/** ¿Este codepoint es una letra matemática, de la familia que sea? */
+function isMathAlphanumeric(codepoint) {
+  return (
+    (codepoint >= MATH_FIRST && codepoint <= MATH_LAST) ||
+    LETTERLIKE_SUBSTITUTES.has(codepoint)
+  );
 }
 
 /**
- * Devuelve `text` sin nada de formato: los caracteres matemáticos vuelven a su
- * letra ASCII y desaparecen las marcas de subrayado y de tachado.
+ * Devuelve `text` sin nada de formato: las letras matemáticas de cualquier
+ * familia vuelven a su equivalente normal y desaparecen las marcas de
+ * subrayado y de tachado.
+ *
+ * Acepta mucho más de lo que `toStyled` produce; el porqué está en el apartado
+ * "estricto al escribir, tolerante al leer" de la cabecera.
+ *
+ * ── El mecanismo ──────────────────────────────────────────────────────────
+ *
+ * `normalize("NFKD")`, la descomposición de **compatibilidad**, aplicada
+ * carácter a carácter y **solo** a los que son letras matemáticas. NFKD ya
+ * sabe que 𝐀, 𝖠, 𝒜, 𝔄, 𝔸 y 𝙰 son la misma "A" con distinta pinta, así que no
+ * hay que escribir catorce tablas de rangos ni mantenerlas cuando Unicode
+ * añada una familia nueva.
+ *
+ * ⚠️ Nunca sobre la cadena entera. NFKD global convertiría ﬁ en "fi", ① en
+ * "1", ² en "2" y ㎡ en "m2": eso ya no es limpiar formato, es reescribir el
+ * contenido del usuario. La comprobación de rango es exactamente lo que separa
+ * una cosa de la otra, y por eso va carácter a carácter.
  *
  * Las diacríticas del español **se conservan**: solo se eliminan las dos marcas
  * que este motor añade como estilo. Una tilde que el usuario escribió es
  * contenido, no formato.
  *
- * Es lo que usará "Limpiar formato" y lo que permitirá reconocer texto ya
- * estilizado pegado desde otra herramienta.
+ * Es lo que usará "Limpiar formato" y, en el S04, lo que normalizará el texto
+ * pegado antes de que entre al modelo.
  *
  * Aquí sí se recompone con NFC, y no por simetría con `toStyled`. Al devolver
  * las bases a ASCII queda texto latino corriente, donde "a" + U+0301 sí tiene
@@ -331,7 +397,9 @@ export function stripStyling(text) {
     if (point === COMBINING.UNDERLINE || point === COMBINING.STRIKETHROUGH) {
       continue;
     }
-    result += unshiftToAscii(point.codePointAt(0)) ?? point;
+    result += isMathAlphanumeric(point.codePointAt(0))
+      ? point.normalize("NFKD")
+      : point;
   }
 
   return result.normalize("NFC");

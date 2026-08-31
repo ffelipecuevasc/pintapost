@@ -410,3 +410,177 @@ describe("isStyleable", () => {
     }
   });
 });
+
+// ── Tolerancia de stripStyling (tarea 7) ───────────────────────────────────
+//
+// El motor solo produce sans-serif, pero casi todos los formateadores de
+// LinkedIn usan serif. Lo que el usuario pegue viene de ahí, y en el S04 esto
+// será lo que normalice el pegado antes de que entre al modelo.
+
+/** Familias del bloque matemático que este motor NO produce. */
+const FAMILIAS_AJENAS = [
+  { nombre: "serif negrita", upper: 0x1d400, lower: 0x1d41a },
+  { nombre: "serif cursiva", upper: 0x1d434, lower: 0x1d44e },
+  { nombre: "script", upper: 0x1d49c, lower: 0x1d4b6 },
+  { nombre: "fraktur", upper: 0x1d504, lower: 0x1d51e },
+  { nombre: "doble raya", upper: 0x1d538, lower: 0x1d552 },
+  { nombre: "monoespaciada", upper: 0x1d670, lower: 0x1d68a },
+];
+
+/**
+ * Los 24 huecos del bloque matemático y el carácter de Letterlike Symbols que
+ * los rellena. Un generador por fórmula que no los sustituyera produciría aquí
+ * codepoints no asignados, así que el texto pegado de verdad los trae.
+ */
+const HUECOS = {
+  "serif cursiva": { h: 0x210e },
+  script: {
+    B: 0x212c, E: 0x2130, F: 0x2131, H: 0x210b, I: 0x2110,
+    L: 0x2112, M: 0x2133, R: 0x211b, e: 0x212f, g: 0x210a, o: 0x2134,
+  },
+  fraktur: { C: 0x212d, H: 0x210c, I: 0x2111, R: 0x211c, Z: 0x2128 },
+  "doble raya": {
+    C: 0x2102, H: 0x210d, N: 0x2115, P: 0x2119,
+    Q: 0x211a, R: 0x211d, Z: 0x2124,
+  },
+};
+
+/** Escribe `texto` en una familia ajena, rellenando sus huecos. */
+function enFamilia(texto, familia) {
+  const huecos = HUECOS[familia.nombre] ?? {};
+  let salida = "";
+
+  for (const letra of texto) {
+    if (huecos[letra] !== undefined) {
+      salida += String.fromCodePoint(huecos[letra]);
+      continue;
+    }
+    const cp = letra.codePointAt(0);
+    if (cp >= 0x41 && cp <= 0x5a) {
+      salida += String.fromCodePoint(familia.upper + cp - 0x41);
+    } else if (cp >= 0x61 && cp <= 0x7a) {
+      salida += String.fromCodePoint(familia.lower + cp - 0x61);
+    } else {
+      salida += letra;
+    }
+  }
+
+  return salida;
+}
+
+describe("stripStyling tolerante", () => {
+  test("ida y vuelta desde las seis familias ajenas, abecedario completo", () => {
+    const abecedario = UPPERCASE + LOWERCASE;
+
+    for (const familia of FAMILIAS_AJENAS) {
+      const ajeno = enFamilia(abecedario, familia);
+
+      // Si el constructor fallara y devolviera ASCII, el test seria vacio.
+      assert.notEqual(ajeno, abecedario, `${familia.nombre} no se transformó`);
+
+      assert.equal(
+        stripStyling(ajeno),
+        abecedario,
+        `no se limpió ${familia.nombre}`,
+      );
+    }
+  });
+
+  test("los 24 sustitutos de Letterlike Symbols vuelven a su ASCII", () => {
+    const SUSTITUTOS = [
+      [0x2102, "C"], [0x210a, "g"], [0x210b, "H"], [0x210c, "H"],
+      [0x210d, "H"], [0x210e, "h"], [0x2110, "I"], [0x2111, "I"],
+      [0x2112, "L"], [0x2115, "N"], [0x2119, "P"], [0x211a, "Q"],
+      [0x211b, "R"], [0x211c, "R"], [0x211d, "R"], [0x2124, "Z"],
+      [0x2128, "Z"], [0x212c, "B"], [0x212d, "C"], [0x212f, "e"],
+      [0x2130, "E"], [0x2131, "F"], [0x2133, "M"], [0x2134, "o"],
+    ];
+
+    assert.equal(SUSTITUTOS.length, 24);
+
+    for (const [codepoint, esperado] of SUSTITUTOS) {
+      const caracter = String.fromCodePoint(codepoint);
+      assert.equal(
+        stripStyling(caracter),
+        esperado,
+        `U+${codepoint.toString(16).toUpperCase()} (${caracter})`,
+      );
+    }
+  });
+
+  test("los dígitos de otras familias también se limpian", () => {
+    // Doble raya (U+1D7D8) y serif negrita (U+1D7CE).
+    for (const inicio of [0x1d7d8, 0x1d7ce]) {
+      const ajenos = rangeFrom(inicio, 10);
+      assert.notEqual(ajenos, DIGITS);
+      assert.equal(stripStyling(ajenos), DIGITS);
+    }
+  });
+
+  test("un pegado real: serif de otra herramienta más lo nuestro", () => {
+    const serif = FAMILIAS_AJENAS[0];
+    const pegado =
+      enFamilia("Hola", serif) +
+      " " +
+      toStyled("mundo", BOLD) +
+      " " +
+      enFamilia("bonito", FAMILIAS_AJENAS[2]) +
+      UNDERLINE;
+
+    assert.equal(stripStyling(pegado), "Hola mundo bonito");
+  });
+
+  test("las tildes sobreviven a la limpieza de una familia ajena", () => {
+    const serif = FAMILIAS_AJENAS[0];
+    // Como lo generaría otra herramienta: base serif + tilde combinable.
+    const conTilde = enFamilia("cancion", serif).replace(
+      enFamilia("o", serif),
+      enFamilia("o", serif) + ACUTE,
+    );
+
+    assert.equal(stripStyling(conTilde), "canción");
+  });
+});
+
+describe("stripStyling NO reescribe contenido", () => {
+  test("NFKD global los destrozaría; el selectivo los deja intactos", () => {
+    // Lo que pasaría con normalize("NFKD") sobre la cadena entera:
+    //   ﬁ → "fi"   ① → "1"   ² → "2"   ㎡ → "m2"   ™ → "TM"   № → "No"
+    for (const caracter of ["ﬁ", "①", "²", "㎡", "™", "ℓ", "№", "½", "Ⅷ"]) {
+      assert.equal(
+        stripStyling(caracter),
+        caracter,
+        `${caracter} fue alterado`,
+      );
+    }
+  });
+
+  test("una frase con ligadura y superíndice no cambia", () => {
+    const frase = "La oﬁcina tiene 25 m² y ① planta.";
+    assert.equal(stripStyling(frase), frase);
+  });
+});
+
+describe("toStyled sigue siendo estricto", () => {
+  test("solo produce sans-serif, nunca las familias que stripStyling acepta", () => {
+    const permitidos = [
+      [BOLD_UPPER, 26], [BOLD_LOWER, 26], [BOLD_DIGITS, 10],
+      [ITALIC_UPPER, 26], [ITALIC_LOWER, 26],
+      [BOLD_ITALIC_UPPER, 26], [BOLD_ITALIC_LOWER, 26],
+    ];
+
+    const dentroDeAlgunBloque = (cp) =>
+      permitidos.some(([inicio, largo]) => cp >= inicio && cp < inicio + largo);
+
+    for (const style of [BOLD, ITALIC, BOLD_ITALIC]) {
+      for (const punto of toStyled(UPPERCASE + LOWERCASE + DIGITS, style)) {
+        const cp = punto.codePointAt(0);
+        if (cp < 0x1d400 || cp > 0x1d7ff) continue; // dígito sin transformar
+        assert.ok(
+          dentroDeAlgunBloque(cp),
+          `U+${cp.toString(16).toUpperCase()} está fuera de los bloques sans-serif`,
+        );
+      }
+    }
+  });
+});
