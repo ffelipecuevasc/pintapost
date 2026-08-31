@@ -1,0 +1,360 @@
+/**
+ * PintaPost — transformación a Unicode matemático y su reversa (S03, B-01/B-04).
+ *
+ * API pública del motor de formato:
+ *
+ *   toStyled(text, style)   texto normal     → texto estilizado para LinkedIn
+ *   stripStyling(text)      texto estilizado → texto normal
+ *   isStyleable(char)       ¿este carácter tiene equivalente en algún bloque?
+ *
+ * Son funciones **puras**: no tocan el DOM, no leen `window` ni `localStorage`,
+ * no mutan sus argumentos y devuelven cadenas nuevas. La conversión ocurre solo
+ * al copiar; el editor nunca contiene estos caracteres (ADR-003).
+ *
+ * ── El algoritmo, en orden ─────────────────────────────────────────────────
+ *
+ * 1. Agrupar el texto en **grafemas** (una letra con todo lo que se dibuja
+ *    encima o pegado a ella), nunca en unidades UTF-16.
+ * 2. Descomponer cada grafema con `normalize("NFD")`, que separa la letra base
+ *    de sus marcas diacríticas: "á" → "a" + U+0301.
+ * 3. Transformar **solo la letra base** con la fórmula de desplazamiento.
+ * 4. Volver a escribir detrás las marcas diacríticas, intactas.
+ * 5. Si el estilo lleva subrayado o tachado, añadir su marca combinable al
+ *    final del grafema completo.
+ *
+ * ── Por qué NFD y no una tabla de letras base ──────────────────────────────
+ *
+ * El bloque matemático no define ninguna letra acentuada y nunca lo hará, así
+ * que la única salida es estilizar la base y devolverle el acento encima. NFD
+ * es exactamente esa operación, y la resuelve con la tabla de descomposición
+ * canónica que ya trae el propio motor de JavaScript.
+ *
+ * Escribir a mano una tabla { "á": "a", "é": "e", … } sería reimplementar peor
+ * un fragmento de esa tabla: cubriría las siete letras del español que uno
+ * recuerde y fallaría en silencio con la primera "à" francesa, "ç" catalana o
+ * "õ" portuguesa, que saldrían en redonda en mitad de una frase en negrita.
+ * Con NFD funcionan todas las latinas acentuadas sin escribir una sola entrada,
+ * y además da igual que el texto llegue precompuesto (U+00E1) o ya descompuesto
+ * ("a" + U+0301): las dos formas acaban en el mismo sitio.
+ *
+ * La salida de `toStyled` **no** se recompone con NFC. U+1D5EE + U+0301 no
+ * tiene forma precompuesta —Unicode no va a asignar un codepoint a "a
+ * sans-serif matemática con tilde"— así que NFC devolvería la cadena idéntica.
+ * Llamarlo no rompería nada, pero sugeriría al que lea el código un cierre
+ * simétrico que no existe. `stripStyling` sí lo hace, y por un motivo
+ * distinto: ver su comentario.
+ */
+
+"use strict";
+
+import { ASCII, BLOCKS, COMBINING, RANGE_LENGTH } from "./blocks.js";
+
+/** U+200D ZERO WIDTH JOINER: el pegamento de los emojis compuestos. */
+const ZWJ = 0x200d;
+
+/** Rango de los indicadores regionales, que van de dos en dos (banderas). */
+const REGIONAL_FIRST = 0x1f1e6;
+const REGIONAL_LAST = 0x1f1ff;
+
+/**
+ * Saltos de línea: LF, CR, y los separadores de línea y de párrafo de Unicode.
+ *
+ * No reciben marca de subrayado ni de tachado: una marca combinable después de
+ * un salto no tiene sobre qué dibujarse y aparece como un resto flotante al
+ * principio de la línea siguiente.
+ *
+ * Se escriben como codepoints numéricos porque U+2028 y U+2029 son invisibles
+ * en el código fuente y nadie sabría qué está leyendo.
+ */
+const LINE_SEPARATOR = String.fromCodePoint(0x2028);
+const PARAGRAPH_SEPARATOR = String.fromCodePoint(0x2029);
+const LINE_BREAKS = new Set(["\n", "\r", LINE_SEPARATOR, PARAGRAPH_SEPARATOR]);
+
+/**
+ * Codepoints que solo aparecen dentro de secuencias de emoji: el ZWJ, el
+ * selector de variación emoji (U+FE0F), el marco de tecla (U+20E3) y los
+ * modificadores de tono de piel.
+ *
+ * Si un grafema contiene alguno, no se le aplica la fórmula aunque su base sea
+ * una letra o un dígito. El emoji de tecla "1️⃣" es 1 + U+FE0F + U+20E3: su
+ * base es un dígito, pero convertirla en un dígito matemático deja el marco
+ * huérfano y rompe el emoji.
+ */
+const VARIATION_SELECTOR_16 = 0xfe0f;
+const COMBINING_KEYCAP = 0x20e3;
+const EMOJI_GLUE = new Set([ZWJ, VARIATION_SELECTOR_16, COMBINING_KEYCAP]);
+
+/** Modificadores de tono de piel (U+1F3FB–U+1F3FF). */
+const EMOJI_MODIFIER = /\p{Emoji_Modifier}/u;
+
+/** Marcas combinables (tildes, virgulillas…) y modificadores de tono de piel. */
+const GRAPHEME_TRAILER = /\p{M}|\p{Emoji_Modifier}/u;
+
+function isRegionalIndicator(codepoint) {
+  return codepoint >= REGIONAL_FIRST && codepoint <= REGIONAL_LAST;
+}
+
+/**
+ * Recorre el texto agrupándolo en grafemas.
+ *
+ * No usa `Intl.Segmenter` a propósito: ADR-003 lo reserva para el contador de
+ * caracteres, que es donde el recuento tiene que ser exacto. Aquí basta con
+ * una aproximación —base más sus marcas, secuencias unidas por ZWJ y pares de
+ * banderas— porque su único cometido es decidir **dónde** cae la marca de
+ * subrayado o de tachado. Un grafema mal agrupado desplaza una rayita; no
+ * corrompe el texto, que se reconstruye por concatenación.
+ *
+ * Itera sobre `[...text]`, que es un array de codepoints. Indexar ese array no
+ * es indexar la cadena: nunca se parte un par subrogado.
+ */
+function* graphemes(text) {
+  const points = [...text];
+  let index = 0;
+
+  while (index < points.length) {
+    let cluster = points[index];
+    index += 1;
+
+    // Banderas: dos indicadores regionales seguidos son un solo grafema.
+    if (
+      isRegionalIndicator(cluster.codePointAt(0)) &&
+      index < points.length &&
+      isRegionalIndicator(points[index].codePointAt(0))
+    ) {
+      cluster += points[index];
+      index += 1;
+    }
+
+    while (index < points.length) {
+      const next = points[index];
+
+      if (GRAPHEME_TRAILER.test(next)) {
+        cluster += next;
+        index += 1;
+        continue;
+      }
+
+      // Tras un ZWJ viene siempre otra pieza del mismo emoji (familias, etc.).
+      if (next.codePointAt(0) === ZWJ && index + 1 < points.length) {
+        cluster += next + points[index + 1];
+        index += 2;
+        continue;
+      }
+
+      break;
+    }
+
+    yield cluster;
+  }
+}
+
+/**
+ * Traduce el estilo pedido al bloque Unicode que le corresponde.
+ *
+ * Devuelve `null` si el estilo no cambia el carácter (solo subrayado, solo
+ * tachado, o ninguno): entonces las letras pasan tal cual y entran únicamente
+ * las marcas combinables.
+ */
+function resolveBlock(style) {
+  if (style.bold && style.italic) return BLOCKS.boldItalic;
+  if (style.bold) return BLOCKS.bold;
+  if (style.italic) return BLOCKS.italic;
+  return null;
+}
+
+/**
+ * La fórmula de desplazamiento: bloque + (codepoint − ancla).
+ *
+ * Devuelve `null` cuando el carácter no tiene equivalente, y entonces quien
+ * llama lo deja intacto.
+ */
+function shiftToBlock(codepoint, block, wantsBold) {
+  if (block === null) return null;
+
+  if (codepoint >= ASCII.UPPER_A && codepoint <= ASCII.UPPER_Z) {
+    return String.fromCodePoint(block.upper + codepoint - ASCII.UPPER_A);
+  }
+
+  if (codepoint >= ASCII.LOWER_A && codepoint <= ASCII.LOWER_Z) {
+    return String.fromCodePoint(block.lower + codepoint - ASCII.LOWER_A);
+  }
+
+  if (codepoint >= ASCII.DIGIT_0 && codepoint <= ASCII.DIGIT_9) {
+    // Unicode no tiene dígitos itálicos (ADR-005). En negrita-cursiva el dígito
+    // se queda con la negrita, que es lo más parecido que existe; en cursiva
+    // pura no hay nada que aplicar y sale intacto.
+    const digits = block.digits ?? (wantsBold ? BLOCKS.bold.digits : null);
+    if (digits === null) return null;
+    return String.fromCodePoint(digits + codepoint - ASCII.DIGIT_0);
+  }
+
+  return null;
+}
+
+/** ¿Este grafema es una secuencia de emoji que no se debe tocar? */
+function isEmojiSequence(cluster) {
+  if (EMOJI_MODIFIER.test(cluster)) return true;
+
+  for (const point of cluster) {
+    if (EMOJI_GLUE.has(point.codePointAt(0))) return true;
+  }
+  return false;
+}
+
+/**
+ * Añade las marcas de subrayado y tachado al final del grafema ya transformado.
+ *
+ * Comprueba antes que no estén puestas: así aplicar subrayado dos veces da el
+ * mismo resultado que aplicarlo una, igual que ocurre de forma natural con la
+ * negrita (una letra ya transformada deja de estar en el rango A–Z y la
+ * fórmula no vuelve a alcanzarla).
+ */
+function addCombiningMarks(styled, cluster, style) {
+  if (LINE_BREAKS.has(cluster)) return styled;
+
+  let out = styled;
+  if (style.underline && !out.includes(COMBINING.UNDERLINE)) {
+    out += COMBINING.UNDERLINE;
+  }
+  if (style.strikethrough && !out.includes(COMBINING.STRIKETHROUGH)) {
+    out += COMBINING.STRIKETHROUGH;
+  }
+  return out;
+}
+
+/** Aplica el estilo a un grafema completo. Pasos 2 a 5 del algoritmo. */
+function styleGrapheme(cluster, block, style) {
+  let out = "";
+
+  if (isEmojiSequence(cluster)) {
+    out = cluster;
+  } else {
+    // NFD separa la base de sus diacríticas. Las marcas nunca son letras ni
+    // dígitos, así que la fórmula solo puede alcanzar a la base.
+    for (const point of cluster.normalize("NFD")) {
+      const shifted = shiftToBlock(point.codePointAt(0), block, style.bold);
+      out += shifted ?? point;
+    }
+  }
+
+  // Un último NFD deja las marcas en orden canónico. No es cosmética: el
+  // subrayado (clase combinante 220) va antes que la tilde (230), y si la
+  // salida no quedara ordenada, aplicar el mismo estilo por segunda vez
+  // devolvería las mismas marcas en otro orden —cadenas equivalentes para
+  // Unicode, distintas para `===`— y el formato dejaría de ser idempotente.
+  // Sigue sin recomponerse con NFC: ver la cabecera del archivo.
+  return addCombiningMarks(out, cluster, style).normalize("NFD");
+}
+
+/**
+ * Convierte `text` al estilo pedido.
+ *
+ * @param {string} text Texto latino normal.
+ * @param {{bold?: boolean, italic?: boolean, underline?: boolean,
+ *          strikethrough?: boolean}} style
+ * @returns {string} Cadena nueva. Cualquier carácter sin mapeo pasa intacto:
+ *   ¿ ¡ º ª « » €, guiones largos, comillas tipográficas, espacios, saltos de
+ *   línea y emojis.
+ */
+export function toStyled(text, style = {}) {
+  if (typeof text !== "string" || text === "") return "";
+
+  const block = resolveBlock(style);
+  const hasMarks = Boolean(style.underline || style.strikethrough);
+
+  // Sin bloque y sin marcas no hay nada que hacer; devolver el original evita
+  // recorrerlo entero para reconstruirlo idéntico.
+  if (block === null && !hasMarks) return text;
+
+  let result = "";
+  for (const cluster of graphemes(text)) {
+    result += styleGrapheme(cluster, block, style);
+  }
+  return result;
+}
+
+/**
+ * Deshace la fórmula: dado un codepoint de cualquiera de los bloques, devuelve
+ * su equivalente ASCII. `null` si no pertenece a ninguno.
+ */
+function unshiftToAscii(codepoint) {
+  for (const block of Object.values(BLOCKS)) {
+    if (
+      codepoint >= block.upper &&
+      codepoint < block.upper + RANGE_LENGTH.LETTERS
+    ) {
+      return String.fromCodePoint(ASCII.UPPER_A + codepoint - block.upper);
+    }
+
+    if (
+      codepoint >= block.lower &&
+      codepoint < block.lower + RANGE_LENGTH.LETTERS
+    ) {
+      return String.fromCodePoint(ASCII.LOWER_A + codepoint - block.lower);
+    }
+
+    if (
+      block.digits !== null &&
+      codepoint >= block.digits &&
+      codepoint < block.digits + RANGE_LENGTH.DIGITS
+    ) {
+      return String.fromCodePoint(ASCII.DIGIT_0 + codepoint - block.digits);
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Devuelve `text` sin nada de formato: los caracteres matemáticos vuelven a su
+ * letra ASCII y desaparecen las marcas de subrayado y de tachado.
+ *
+ * Las diacríticas del español **se conservan**: solo se eliminan las dos marcas
+ * que este motor añade como estilo. Una tilde que el usuario escribió es
+ * contenido, no formato.
+ *
+ * Es lo que usará "Limpiar formato" y lo que permitirá reconocer texto ya
+ * estilizado pegado desde otra herramienta.
+ *
+ * Aquí sí se recompone con NFC, y no por simetría con `toStyled`. Al devolver
+ * las bases a ASCII queda texto latino corriente, donde "a" + U+0301 sí tiene
+ * forma precompuesta; sin recomponer, `stripStyling(toStyled("á"))` devolvería
+ * dos codepoints en lugar de uno: idéntico en pantalla, distinto para `===`.
+ * NFC deja la salida en la forma canónica normal, que es la que espera
+ * cualquier consumidor.
+ */
+export function stripStyling(text) {
+  if (typeof text !== "string" || text === "") return "";
+
+  let result = "";
+  for (const point of text) {
+    if (point === COMBINING.UNDERLINE || point === COMBINING.STRIKETHROUGH) {
+      continue;
+    }
+    result += unshiftToAscii(point.codePointAt(0)) ?? point;
+  }
+
+  return result.normalize("NFC");
+}
+
+/**
+ * ¿Este carácter tiene equivalente en algún bloque matemático?
+ *
+ * Mira la letra base tras descomponer, así que "á" es estilizable aunque el
+ * bloque no contenga ninguna vocal acentuada. Los dígitos lo son porque existen
+ * en negrita. Las secuencias de emoji no, aunque empiecen por un dígito.
+ *
+ * @param {string} char Un solo carácter o grafema. Si llega más de uno, se
+ *   evalúa el primero.
+ * @returns {boolean}
+ */
+export function isStyleable(char) {
+  if (typeof char !== "string" || char === "") return false;
+  if (isEmojiSequence(char)) return false;
+
+  const [base] = char.normalize("NFD");
+  if (base === undefined) return false;
+
+  // El bloque de negrita es el que más cubre: es el único con dígitos.
+  return shiftToBlock(base.codePointAt(0), BLOCKS.bold, true) !== null;
+}

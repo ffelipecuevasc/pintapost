@@ -11,6 +11,7 @@
     "build": "pnpm run build:fonts && pnpm run build:css",
     "dev": "pnpm run watch:css",
     "preview": "wrangler dev",
+    "test": "node --test \"tests/**/*.test.js\"",
     "clean": "node -e \"import('node:fs').then(fs=>{fs.rmSync('public/static/css/tailwind.css',{force:true});fs.rmSync('public/static/assets/fonts',{force:true,recursive:true})})\""
   },
   "devDependencies": {

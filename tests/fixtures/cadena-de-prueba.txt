@@ -1,0 +1,45 @@
+PintaPost - cadena de prueba S03 (verificacion visual)
+Pega este bloque completo en el editor de LinkedIn SIN publicar.
+Revisa linea por linea en cada entorno. Lo critico son los puntos 3, 4 y 11:
+que la tilde quede bien centrada sobre la letra, no desplazada.
+
+1. NEGRITA - abecedario completo
+𝗔𝗕𝗖𝗗𝗘𝗙𝗚𝗛𝗜𝗝𝗞𝗟𝗠𝗡𝗢𝗣𝗤𝗥𝗦𝗧𝗨𝗩𝗪𝗫𝗬𝗭
+𝗮𝗯𝗰𝗱𝗲𝗳𝗴𝗵𝗶𝗷𝗸𝗹𝗺𝗻𝗼𝗽𝗾𝗿𝘀𝘁𝘂𝘃𝘄𝘅𝘆𝘇
+
+2. CURSIVA - abecedario completo
+𝘈𝘉𝘊𝘋𝘌𝘍𝘎𝘏𝘐𝘑𝘒𝘓𝘔𝘕𝘖𝘗𝘘𝘙𝘚𝘛𝘜𝘝𝘞𝘟𝘠𝘡
+𝘢𝘣𝘤𝘥𝘦𝘧𝘨𝘩𝘪𝘫𝘬𝘭𝘮𝘯𝘰𝘱𝘲𝘳𝘴𝘵𝘶𝘷𝘸𝘹𝘺𝘻
+
+3. NEGRITA - vocales acentuadas, dieresis y enye
+𝗮́𝗲́𝗶́𝗼́𝘂́𝘂̈𝗻̃ 𝗔́𝗘́𝗜́𝗢́𝗨́𝗨̈𝗡̃
+
+4. CURSIVA - vocales acentuadas, dieresis y enye
+𝘢́𝘦́𝘪́𝘰́𝘶́𝘶̈𝘯̃ 𝘈́𝘌́𝘐́𝘖́𝘜́𝘜̈𝘕̃
+
+5. NEGRITA - apertura de interrogacion y exclamacion
+¿𝗖𝗼́𝗺𝗼 𝗲𝘀𝘁𝗮́𝘀? ¡𝗤𝘂𝗲́ 𝘁𝗮𝗹!
+
+6. NEGRITA - digitos
+𝟬𝟭𝟮𝟯𝟰𝟱𝟲𝟳𝟴𝟵
+
+7. SUBRAYADO
+E̲s̲t̲a̲ ̲l̲i̲n̲e̲a̲ ̲v̲a̲ ̲s̲u̲b̲r̲a̲y̲a̲d̲a̲ ̲d̲e̲ ̲p̲r̲i̲n̲c̲i̲p̲i̲o̲ ̲a̲ ̲f̲i̲n̲.̲
+
+8. TACHADO
+E̶s̶t̶a̶ ̶l̶i̶n̶e̶a̶ ̶v̶a̶ ̶t̶a̶c̶h̶a̶d̶a̶ ̶d̶e̶ ̶p̶r̶i̶n̶c̶i̶p̶i̶o̶ ̶a̶ ̶f̶i̶n̶.̶
+
+9. EMOJI - deben verse enteros, sin cuadros ni piezas sueltas
+𝗘𝗺𝗼𝗷𝗶𝘀: 😀 𝗳𝗮𝗺𝗶𝗹𝗶𝗮 👨‍👩‍👧 𝗯𝗮𝗻𝗱𝗲𝗿𝗮 🇨🇱 𝗽𝘂𝗹𝗴𝗮𝗿 👍🏽 𝘁𝗲𝗰𝗹𝗮 1️⃣
+
+--- Extras fuera de la lista del sprint, utiles en el mismo pegado ---
+
+10. NEGRITA-CURSIVA - el tercer bloque, que los puntos 1 y 2 no cubren
+𝘼𝘽𝘾𝘿𝙀𝙁𝙂𝙃𝙄𝙅𝙆𝙇𝙈𝙉𝙊𝙋𝙌𝙍𝙎𝙏𝙐𝙑𝙒𝙓𝙔𝙕
+𝙖𝙗𝙘𝙙𝙚𝙛𝙜𝙝𝙞𝙟𝙠𝙡𝙢𝙣𝙤𝙥𝙦𝙧𝙨𝙩𝙪𝙫𝙬𝙭𝙮𝙯
+
+11. PEOR CASO - tilde y subrayado apilados sobre la misma letra
+𝗰̲𝗮̲𝗻̲𝗰̲𝗶̲𝗼̲́𝗻̲ ̲𝗮̲𝗻̲̃𝗲̲𝗷̲𝗮̲ ̲𝗴̲𝘂̲̈𝗲̲𝗿̲𝗼̲
+
+12. TEXTO CORRIDO - como se veria un post de verdad
+𝗘𝗹 𝘀𝗲𝗻̃𝗼𝗿 𝗠𝘂𝗻̃𝗼𝘇 compartió su informe anual y añadió 𝟰𝟮 𝗶𝗱𝗲𝗮𝘀 que vale la pena leer. #Marketing @LinkedIn
