@@ -63,4 +63,6 @@ futuros ni épicas ya completadas: gastan contexto y arrastran suposiciones viej
 - Todo mapeo o transformación Unicode debe tener test en `tests/`.
 - Commits en Conventional Commits, con descripción en español.
   Ejemplo: `feat(editor): añadir contador dual de caracteres`
-- Nunca uses `localStorage` para nada que no sean borradores del usuario.
+- `localStorage` solo para datos del propio usuario: sus borradores y sus
+  preferencias de interfaz (hoy solo el tema, `pintapost:theme`). Nunca para
+  caché, estado de la aplicación ni nada que deba vivir en el modelo. (ADR-017)

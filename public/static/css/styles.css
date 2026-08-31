@@ -79,37 +79,6 @@
     U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
-/* --- marcas diacríticas combinables (ADR-005) ---------------------------- */
-/* El serializador compone las vocales acentuadas como letra matemática +
-   marca combinable: á = 𝗮 + U+0301, ñ = 𝗻 + U+0303. Ni latin ni latin-ext
-   traen esas dos marcas — U+0308 (diéresis) y U+0304 sí están en latin, pero
-   el agudo y la virgulilla no. El único subconjunto de Inter que las incluye
-   es el vietnamita.
-
-   El unicode-range se acota deliberadamente a las marcas: del archivo no nos
-   interesan las letras vietnamitas (U+1EA0-1EF9), y declarar el rango completo
-   solo serviría para descargarlo en textos que la aplicación no va a producir.
-   Así el archivo (10 kB) solo entra en juego cuando hay una marca combinable en
-   pantalla, y las marcas se dibujan con la misma fuente que su letra base, que
-   es lo que mantiene alineado el mark positioning. */
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
-  font-display: swap;
-  font-weight: 400 900;
-  src: url('/static/assets/fonts/inter-vietnamese-wght-normal.woff2') format('woff2-variations');
-  unicode-range: U+0300-0301, U+0303;
-}
-
-@font-face {
-  font-family: 'Inter';
-  font-style: italic;
-  font-display: swap;
-  font-weight: 400 900;
-  src: url('/static/assets/fonts/inter-vietnamese-wght-italic.woff2') format('woff2-variations');
-  unicode-range: U+0300-0301, U+0303;
-}
-
 /* =========================================================================
    1. TOKENS DE COLOR  (ADR-011)
    -------------------------------------------------------------------------
@@ -186,7 +155,8 @@
   --inverse-on-surface:          234 241 255;   /* #eaf1ff */
 
     /* --- Contornos ----------------------------------------------------- */
-  --outline:                     115 118 134;   /* #737686 */
+  --outline:                      97 100 114;   /* #616472 — bajado desde #737686
+                                                    para cumplir AA (X-11) */
   --outline-variant:             195 198 215;   /* #c3c6d7 */
 
     /* --- Sombra de tarjeta (se usaba inline en el prototipo) ----------- */
@@ -201,8 +171,12 @@
      contenedores bajan. Los roles "fixed" NO cambian entre temas: ese es su
      propósito en M3 (mantener un color constante en ambos modos).
 
-     ⚠️ PENDIENTE: verificar contraste AA (4.5:1 texto normal, 3:1 texto
-     grande y elementos de interfaz) antes de cerrar el sprint S02.
+     ✅ Contraste AA verificado el 2026-08-30 con Lighthouse 13.4.1. El tema
+     oscuro cumplía ya (5,41–6,16). El claro no: `--outline` daba 4,08–4,28 y
+     Lighthouse marcaba `color-contrast` en 7 elementos. Corregido a #616472,
+     que pasa AA sobre los seis fondos claros de la paleta en uso (peor caso
+     4,80 sobre --surface-container-high). Único fondo que no alcanzaría 4,5 es
+     --surface-dim (4,19), que está declarado pero no lo usa nadie.
      ======================================================================= */
 .dark {
     /* --- Primario ------------------------------------------------------ */
