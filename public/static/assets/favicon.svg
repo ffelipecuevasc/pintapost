@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PintaPost — favicon.
+
+  Trazado a mano en lugar de con <text>: el marcado de un favicon se dibuja
+  fuera de la página, donde no existe Inter ni ninguna fuente propia, y un
+  <text> acabaría renderizado con la tipografía de cada sistema.
+
+  El azul es el token de color primario del tema claro (#004ac6). No cambia con
+  el tema: la pestaña se ve sobre el fondo del navegador, no sobre el de la
+  aplicación, y una P blanca sobre azul tiene contraste suficiente en ambos.
+
+  La contraforma de la P mide 6 de 32 unidades, así que sigue abierta al
+  escalar a 16 px.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img"
+     aria-label="PintaPost">
+  <rect width="32" height="32" rx="7" fill="#004ac6"/>
+  <path fill="#ffffff" fill-rule="evenodd"
+        d="M8 5 H16 A7 7 0 0 1 16 19 H12 V27 H8 Z
+           M12 9 H16 A3 3 0 0 1 16 15 H12 Z"/>
+</svg>

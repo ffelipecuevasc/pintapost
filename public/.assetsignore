@@ -4,3 +4,6 @@
 
 # El CSS de entrada no se sirve: solo su compilado tailwind.css
 static/css/styles.css
+
+# Marcador de carpeta para Git: no es un asset publicable.
+.gitkeep

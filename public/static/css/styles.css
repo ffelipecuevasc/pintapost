@@ -13,6 +13,104 @@
 @tailwind utilities;
 
 /* =========================================================================
+   0. FUENTES AUTO-HOSPEDADAS  (ADR-010)
+   -------------------------------------------------------------------------
+   Inter variable, servida desde nuestro propio dominio. Los .woff2 los copia
+   `pnpm run build:fonts` desde @fontsource-variable/inter a
+   public/static/assets/fonts/: el paquete es una dependencia de desarrollo,
+   nunca llega al navegador.
+
+   Un solo @font-face por subconjunto y estilo: al ser fuente variable, el
+   rango `font-weight: 400 900` cubre de una vez los cinco pesos que el
+   prototipo pedia sueltos a Google Fonts (400, 500, 600, 700, 900).
+
+   Los `unicode-range` son los del propio paquete. Gracias a ellos el
+   navegador solo descarga latin-ext si la pagina usa algun glifo de ese
+   rango; para castellano (a con tilde, enye y diéresis viven en U+00C0-00FF)
+   basta con el subconjunto latin.
+
+   font-display: swap — el texto se ve desde el primer frame con la fuente de
+   sistema y se sustituye al cargar Inter. Sin FOIT.
+   ========================================================================= */
+
+/* --- latin --------------------------------------------------------------- */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400 900;
+  src: url('/static/assets/fonts/inter-latin-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: italic;
+  font-display: swap;
+  font-weight: 400 900;
+  src: url('/static/assets/fonts/inter-latin-wght-italic.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* --- latin-ext ----------------------------------------------------------- */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400 900;
+  src: url('/static/assets/fonts/inter-latin-ext-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+    U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+    U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: italic;
+  font-display: swap;
+  font-weight: 400 900;
+  src: url('/static/assets/fonts/inter-latin-ext-wght-italic.woff2') format('woff2-variations');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF,
+    U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020,
+    U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* --- marcas diacríticas combinables (ADR-005) ---------------------------- */
+/* El serializador compone las vocales acentuadas como letra matemática +
+   marca combinable: á = 𝗮 + U+0301, ñ = 𝗻 + U+0303. Ni latin ni latin-ext
+   traen esas dos marcas — U+0308 (diéresis) y U+0304 sí están en latin, pero
+   el agudo y la virgulilla no. El único subconjunto de Inter que las incluye
+   es el vietnamita.
+
+   El unicode-range se acota deliberadamente a las marcas: del archivo no nos
+   interesan las letras vietnamitas (U+1EA0-1EF9), y declarar el rango completo
+   solo serviría para descargarlo en textos que la aplicación no va a producir.
+   Así el archivo (10 kB) solo entra en juego cuando hay una marca combinable en
+   pantalla, y las marcas se dibujan con la misma fuente que su letra base, que
+   es lo que mantiene alineado el mark positioning. */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400 900;
+  src: url('/static/assets/fonts/inter-vietnamese-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0300-0301, U+0303;
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: italic;
+  font-display: swap;
+  font-weight: 400 900;
+  src: url('/static/assets/fonts/inter-vietnamese-wght-italic.woff2') format('woff2-variations');
+  unicode-range: U+0300-0301, U+0303;
+}
+
+/* =========================================================================
    1. TOKENS DE COLOR  (ADR-011)
    -------------------------------------------------------------------------
    Los valores son canales RGB separados por espacios, sin la función rgb().
@@ -186,6 +284,19 @@ body {
   box-shadow: var(--shadow-card);
 }
 
+/* Botón cuadrado de solo icono: tema, GitHub y, más adelante, la barra de
+   herramientas. Se declara como componente porque el patrón se repite y el
+   HTML solo debe llevar clases (ADR-015).
+
+   44×44 px es el área táctil mínima que pide A-08, y se aplica también en
+   escritorio: tener dos tamaños del mismo control complica el CSS sin que
+   nadie lo agradezca. El icono de dentro sigue siendo de 20 px. */
+.icon-button {
+  @apply inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg
+    text-on-surface-variant transition-colors
+    hover:bg-surface-container hover:text-primary;
+}
+
 /* =========================================================================
    4. UTILIDADES
    ========================================================================= */
@@ -204,6 +315,27 @@ body {
 /* Respeta el área segura de los dispositivos con notch. */
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* El triangulito nativo del <summary> sobra: el chevron del sprite ya indica
+   el estado. La utilidad `list-none` lo quita en Chrome y Firefox, pero WebKit
+   lo dibuja con un pseudo-elemento propio que no se alcanza desde el marcado.
+   (ADR-015: lo que no encaja en una utilidad se declara aquí.) */
+summary::-webkit-details-marker {
+  display: none;
+}
+
+/* En escritorio el panel de utilidades va siempre desplegado y su <summary>
+   está oculto con `md:hidden`. Sin esta regla, un usuario que pliegue el panel
+   en móvil y luego ensanche la ventana se quedaría con el panel vacío y sin
+   ningún control para reabrirlo.
+
+   `::details-content` es reciente (Chrome 131, Safari 18.4). Donde no exista,
+   la regla se ignora sin efectos secundarios y solo queda ese caso raro. */
+@media (min-width: 768px) {
+  .panel-details::details-content {
+    content-visibility: visible;
+  }
 }
 
 /* =========================================================================

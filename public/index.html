@@ -1,164 +1,113 @@
 <!DOCTYPE html>
 
-<html class="light" lang="es">
+<html lang="es">
 <head>
     <meta charset="utf-8"/>
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-    <title>PintaPost - LinkedIn Post Editor</title>
-    <link href="https://fonts.googleapis.com" rel="preconnect"/>
-    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&amp;display=swap"
-          rel="stylesheet"/>
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
-          rel="stylesheet"/>
-    <link rel="stylesheet" href="/static/css/tailwind.css">
-    <style>
-        .material-symbols-outlined {
-            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-        }
+    <title>PintaPost — Negrita y cursiva para publicaciones de LinkedIn</title>
+    <meta name="description" content="Editor gratuito para dar formato a tus publicaciones de LinkedIn: negrita, cursiva y listas que sobreviven al pegar. Sin cuenta y sin instalar nada."/>
+    <meta name="theme-color" content="#f8f9ff"/>
+    <link rel="icon" type="image/svg+xml" href="/static/assets/favicon.svg"/>
 
-        .icon-fill {
-            font-variation-settings: 'FILL' 1;
-        }
-    </style>
+    <!-- Open Graph. Sin og:url ni og:image todavía: el dominio se decide en el
+         S07 (C-07) y la imagen social es parte de C-10 completa. -->
+    <meta property="og:title" content="PintaPost — Negrita y cursiva para publicaciones de LinkedIn"/>
+    <meta property="og:description" content="Editor gratuito para dar formato a tus publicaciones de LinkedIn: negrita, cursiva y listas que sobreviven al pegar. Sin cuenta y sin instalar nada."/>
+    <meta property="og:type" content="website"/>
+    <meta property="og:locale" content="es_ES"/>
+    <!-- Tema aplicado antes de pintar nada: sin esto, cargar en modo oscuro
+         produce un destello blanco. Es la excepción acotada de ADR-015 (asigna
+         desde JS en runtime, no declara estilo en el marcado). -->
+    <script>
+        (function () {
+            try {
+                var stored = localStorage.getItem('pintapost:theme');
+                var dark = stored === 'dark' || (stored !== 'light'
+                    && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                if (dark) document.documentElement.classList.add('dark');
+                // Los dos valores son el token --background de styles.css.
+                document.querySelector('meta[name="theme-color"]')
+                    .setAttribute('content', dark ? '#0b1420' : '#f8f9ff');
+            } catch (e) {
+                // Almacenamiento bloqueado: se queda en claro, sin romper nada.
+            }
+        })();
+    </script>
+    <link rel="preload" href="/static/assets/fonts/inter-latin-wght-normal.woff2" as="font"
+          type="font/woff2" crossorigin/>
+    <link rel="stylesheet" href="/static/css/tailwind.css">
 </head>
 <body class="bg-background text-on-background min-h-screen flex flex-col antialiased">
-<!-- TopAppBar from JSON -->
+<!-- Cabecera -->
 <header class="w-full top-0 sticky bg-surface shadow-sm z-50">
-    <div class="flex justify-between items-center px-margin-mobile md:px-margin-desktop py-4 max-w-container-max mx-auto">
-        <div class="flex items-center gap-8">
-            <div class="text-headline-md font-headline-md font-black text-primary">PintaPost</div>
-            <!-- Nav Links - Hidden on Mobile, Flex on Desktop -->
-            <nav class="hidden md:flex gap-6 items-center">
-                <a class="text-primary border-b-2 border-primary pb-1 font-label-md text-label-md transition-colors cursor-pointer active:opacity-80"
-                   href="#">Dashboard</a>
-                <a class="text-on-surface-variant hover:text-primary transition-colors cursor-pointer active:opacity-80 font-label-md text-label-md"
-                   href="#">Analytics</a>
-                <a class="text-on-surface-variant hover:text-primary transition-colors cursor-pointer active:opacity-80 font-label-md text-label-md"
-                   href="#">Settings</a>
-            </nav>
-        </div>
-        <div class="flex items-center gap-4">
-            <button class="text-on-surface-variant hover:text-primary transition-colors" data-icon="notifications">
-                <span class="material-symbols-outlined">notifications</span>
+    <div class="flex justify-between items-center gap-4 px-margin-mobile md:px-margin-desktop py-4 max-w-container-max mx-auto">
+        <h1 class="flex items-baseline gap-3 min-w-0">
+            <span class="text-headline-md font-headline-md font-black text-primary">PintaPost</span>
+            <span class="hidden sm:block font-body-sm text-body-sm text-outline truncate">Formato que LinkedIn no borra</span>
+        </h1>
+        <div class="flex items-center gap-1 shrink-0">
+            <button class="icon-button" type="button" id="theme-toggle"
+                    aria-label="Activar modo oscuro" title="Cambiar tema">
+                <svg class="w-5 h-5" aria-hidden="true"><use id="theme-toggle-icon" href="/static/assets/icons.svg#moon"></use></svg>
             </button>
-            <button class="text-on-surface-variant hover:text-primary transition-colors" data-icon="account_circle">
-                <span class="material-symbols-outlined">account_circle</span>
-            </button>
-            <button class="hidden md:flex items-center justify-center bg-primary text-on-primary px-4 py-2 rounded-lg font-label-md text-label-md hover:brightness-110 transition-all shadow-sm">
-                New Post
-            </button>
+            <a class="icon-button" href="https://github.com/ffelipecuevasc/pintapost"
+               target="_blank" rel="noopener noreferrer"
+               aria-label="Código fuente en GitHub (se abre en una pestaña nueva)"
+               title="Código fuente en GitHub">
+                <svg class="w-5 h-5" aria-hidden="true"><use href="/static/assets/icons.svg#github"></use></svg>
+            </a>
         </div>
     </div>
 </header>
-<!-- Main Workspace -->
+<!-- Área de trabajo -->
 <div class="flex-1 flex flex-col md:flex-row w-full max-w-container-max mx-auto">
-    <!-- SideNavBar from JSON (Visible on Desktop only) -->
-    <aside class="hidden md:flex flex-col w-64 h-[calc(100vh-73px)] sticky top-[73px] bg-surface-container-low border-r border-outline-variant">
-        <div class="p-6">
-            <h2 class="text-label-sm font-label-sm text-outline uppercase tracking-wider mb-1">Workspace</h2>
-            <p class="text-headline-md font-headline-md text-primary font-bold">Creator Pro</p>
-        </div>
-        <nav class="flex-1 flex flex-col gap-1 px-2">
-            <a class="flex items-center gap-3 px-4 py-3 text-primary font-bold bg-surface-container-high rounded-lg transition-all"
-               data-icon="edit_note" href="#">
-                <span class="material-symbols-outlined icon-fill">edit_note</span>
-                <span class="font-label-md text-label-md">Editor</span>
-            </a>
-            <a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg"
-               data-icon="auto_awesome_motion" href="#">
-                <span class="material-symbols-outlined">auto_awesome_motion</span>
-                <span class="font-label-md text-label-md">Templates</span>
-            </a>
-            <a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg"
-               data-icon="library_books" href="#">
-                <span class="material-symbols-outlined">library_books</span>
-                <span class="font-label-md text-label-md">Library</span>
-            </a>
-            <a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg"
-               data-icon="calendar_today" href="#">
-                <span class="material-symbols-outlined">calendar_today</span>
-                <span class="font-label-md text-label-md">Schedule</span>
-            </a>
-        </nav>
-        <div class="p-4 mt-auto border-t border-outline-variant/30">
-            <button class="w-full mb-4 bg-secondary-container text-on-secondary-container py-2 rounded-lg font-label-md text-label-md hover:brightness-110 transition-all">
-                Upgrade Plan
-            </button>
-            <div class="flex flex-col gap-1">
-                <a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg"
-                   data-icon="help_outline" href="#">
-                    <span class="material-symbols-outlined">help_outline</span>
-                    <span class="font-label-sm text-label-sm">Help</span>
-                </a>
-                <a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:bg-surface-container-high transition-colors rounded-lg"
-                   data-icon="settings" href="#">
-                    <span class="material-symbols-outlined">settings</span>
-                    <span class="font-label-sm text-label-sm">Settings</span>
-                </a>
-            </div>
-        </div>
-    </aside>
-    <!-- Main Content Area -->
-    <main class="flex-1 flex flex-col items-center px-margin-mobile md:px-gutter py-8 md:py-12 overflow-y-auto">
+    <!-- Contenido principal -->
+    <main class="flex-1 flex flex-col items-center px-margin-mobile md:px-gutter py-8 md:py-12 md:overflow-y-auto">
         <div class="w-full max-w-[720px] flex flex-col gap-6">
-            <!-- AI Generator Section -->
-            <section
-                    class="card p-6 flex flex-col sm:flex-row gap-4 items-center justify-between">
-                <div class="flex-1 w-full">
-                    <h3 class="text-body-md font-body-md font-semibold text-on-surface mb-2">Generador de Ideas IA</h3>
-                    <div class="relative">
-                        <select class="w-full appearance-none bg-surface-bright border border-outline-variant rounded-lg py-2 pl-4 pr-10 text-body-sm font-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all">
-                            <option>Liderazgo y Management</option>
-                            <option>Productividad Personal</option>
-                            <option>Desarrollo de Software</option>
-                            <option>Marketing Digital</option>
-                        </select>
-                        <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-outline pointer-events-none">expand_more</span>
-                    </div>
-                </div>
-                <button class="w-full sm:w-auto flex items-center justify-center gap-2 bg-primary-container text-on-primary-container px-6 py-2.5 rounded-lg font-label-md text-label-md hover:brightness-110 transition-all whitespace-nowrap mt-4 sm:mt-6">
-                    <span class="material-symbols-outlined">auto_awesome</span>
-                    Generar idea con IA
-                </button>
-            </section>
-            <!-- LinkedIn Editor Card -->
+            <!-- Tarjeta del editor -->
             <section
                     class="card flex flex-col">
-                <!-- Editor Toolbar -->
-                <div class="flex items-center gap-2 p-3 border-b border-outline-variant/30 bg-surface-bright rounded-t-xl overflow-x-auto no-scrollbar">
-                    <button class="p-2 text-on-surface-variant hover:text-primary hover:bg-surface-container rounded transition-colors"
-                            title="Negrita">
-                        <span class="material-symbols-outlined">format_bold</span>
+                <!-- Barra de herramientas. Los botones son cascarones: la
+                     lógica de formato llega en el S04. -->
+                <div class="flex items-center gap-1 p-3 border-b border-outline-variant/30 bg-surface-bright rounded-t-xl overflow-x-auto no-scrollbar"
+                     role="toolbar" aria-label="Formato de texto">
+                    <button class="icon-button" type="button" aria-pressed="false"
+                            aria-label="Negrita" title="Negrita">
+                        <svg class="w-5 h-5" aria-hidden="true"><use href="/static/assets/icons.svg#bold"></use></svg>
                     </button>
-                    <button class="p-2 text-on-surface-variant hover:text-primary hover:bg-surface-container rounded transition-colors"
-                            title="Cursiva">
-                        <span class="material-symbols-outlined">format_italic</span>
+                    <button class="icon-button" type="button" aria-pressed="false"
+                            aria-label="Cursiva" title="Cursiva">
+                        <svg class="w-5 h-5" aria-hidden="true"><use href="/static/assets/icons.svg#italic"></use></svg>
                     </button>
-                    <div class="w-px h-6 bg-outline-variant/50 mx-1"></div>
-                    <button class="p-2 text-on-surface-variant hover:text-primary hover:bg-surface-container rounded transition-colors"
-                            title="Lista con viñetas">
-                        <span class="material-symbols-outlined">format_list_bulleted</span>
+                    <button class="icon-button" type="button" aria-pressed="false"
+                            aria-label="Subrayado" title="Subrayado">
+                        <svg class="w-5 h-5" aria-hidden="true"><use href="/static/assets/icons.svg#underline"></use></svg>
                     </button>
-                    <button class="p-2 text-on-surface-variant hover:text-primary hover:bg-surface-container rounded transition-colors"
-                            title="Lista numerada">
-                        <span class="material-symbols-outlined">format_list_numbered</span>
+                    <button class="icon-button" type="button" aria-pressed="false"
+                            aria-label="Tachado" title="Tachado">
+                        <svg class="w-5 h-5" aria-hidden="true"><use href="/static/assets/icons.svg#strikethrough"></use></svg>
                     </button>
-                    <div class="w-px h-6 bg-outline-variant/50 mx-1"></div>
-                    <button class="p-2 text-on-surface-variant hover:text-primary hover:bg-surface-container rounded transition-colors"
-                            title="Emojis">
-                        <span class="material-symbols-outlined">sentiment_satisfied</span>
+                    <div class="w-px h-6 shrink-0 bg-outline-variant/50 mx-1" role="separator" aria-orientation="vertical"></div>
+                    <button class="icon-button" type="button"
+                            aria-label="Lista con viñetas" title="Lista con viñetas">
+                        <svg class="w-5 h-5" aria-hidden="true"><use href="/static/assets/icons.svg#list-bulleted"></use></svg>
                     </button>
-                    <div class="ml-auto flex items-center gap-2">
-                        <span class="text-label-sm font-label-sm text-outline px-2 py-1 bg-surface-container rounded-full">Draft</span>
-                    </div>
+                    <button class="icon-button" type="button"
+                            aria-label="Lista numerada" title="Lista numerada">
+                        <svg class="w-5 h-5" aria-hidden="true"><use href="/static/assets/icons.svg#list-numbered"></use></svg>
+                    </button>
+                    <div class="w-px h-6 shrink-0 bg-outline-variant/50 mx-1" role="separator" aria-orientation="vertical"></div>
+                    <button class="icon-button" type="button"
+                            aria-label="Limpiar formato" title="Limpiar formato">
+                        <svg class="w-5 h-5" aria-hidden="true"><use href="/static/assets/icons.svg#clear-format"></use></svg>
+                    </button>
                 </div>
-                <!-- LinkedIn Style Preview Area -->
+                <!-- Zona con aspecto de publicación de LinkedIn -->
                 <div class="p-6 flex flex-col gap-4">
-                    <!-- Mock Author Header -->
+                    <!-- Cabecera de autor simulada (germen de la vista previa, C-02) -->
                     <div class="flex items-center gap-3">
                         <div class="w-12 h-12 rounded-full bg-surface-container-high flex items-center justify-center overflow-hidden">
-                            <span class="material-symbols-outlined text-outline text-2xl">person</span>
+                            <svg class="w-6 h-6 text-outline" aria-hidden="true"><use href="/static/assets/icons.svg#person"></use></svg>
                         </div>
                         <div>
                             <div class="font-body-md text-body-md font-semibold text-on-surface leading-tight">Tu
@@ -170,41 +119,65 @@
                             <div class="flex items-center gap-1 font-label-sm text-label-sm text-outline mt-0.5">
                                 <span>Justo ahora</span>
                                 <span>•</span>
-                                <span class="material-symbols-outlined text-[14px]">public</span>
+                                <svg class="w-3.5 h-3.5" aria-hidden="true"><use href="/static/assets/icons.svg#globe"></use></svg>
                             </div>
                         </div>
                     </div>
-                    <!-- Editable Content Area -->
-                    <div class="w-full min-h-[200px] outline-none font-body-md text-body-md text-on-surface whitespace-pre-wrap focus:ring-0"
+                    <!-- Área editable. Arranca con is-empty para que el
+                         marcador de posición se vea antes de que corra el JS. -->
+                    <div class="w-full min-h-[200px] outline-none font-body-md text-body-md text-on-surface whitespace-pre-wrap is-empty"
+                         id="editor"
                          contenteditable="true"
-                         placeholder="¿De qué quieres hablar? Empieza a escribir tu post aquí..."></div>
+                         role="textbox"
+                         aria-multiline="true"
+                         aria-label="Editor de publicación"
+                         spellcheck="true"
+                         lang="es"
+                         data-placeholder="¿De qué quieres hablar? Empieza a escribir tu post aquí..."></div>
                 </div>
             </section>
-            <!-- Action Footer -->
+            <!-- Pie de acciones -->
             <div class="flex justify-end pt-4">
-                <button class="flex items-center gap-2 bg-primary text-on-primary px-8 py-3 rounded-lg font-label-md text-label-md hover:brightness-110 shadow-sm transition-all active:scale-95">
-                    <span class="material-symbols-outlined">content_copy</span>
+                <button class="flex items-center gap-2 bg-primary text-on-primary px-8 py-3 rounded-lg font-label-md text-label-md hover:brightness-110 shadow-sm transition-all active:scale-95"
+                        type="button">
+                    <svg class="w-5 h-5" aria-hidden="true"><use href="/static/assets/icons.svg#copy"></use></svg>
                     Copiar para LinkedIn
                 </button>
             </div>
         </div>
     </main>
+    <!-- Panel de utilidades. Va DESPUÉS del <main> en el DOM para que en móvil
+         caiga bajo el editor sin trucos; en escritorio md:order-first lo
+         devuelve a la izquierda. Las tres secciones son cascarones: se llenan
+         en S05 (contador) y S06 (borradores y vista previa). -->
+    <aside class="w-full bg-surface-container-low border-t border-outline-variant md:order-first md:w-64 md:shrink-0 md:self-start md:sticky md:top-[73px] md:h-[calc(100vh-73px)] md:overflow-y-auto md:border-t-0 md:border-r"
+           aria-label="Utilidades">
+        <details class="group panel-details" open>
+            <summary class="md:hidden flex items-center justify-between gap-2 list-none cursor-pointer select-none px-margin-mobile py-4 font-label-md text-label-md text-on-surface-variant transition-colors hover:text-primary">
+                Utilidades
+                <svg class="w-5 h-5 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true"><use href="/static/assets/icons.svg#chevron-down"></use></svg>
+            </summary>
+            <div class="flex flex-col gap-8 px-margin-mobile pb-6 md:p-6">
+                <section>
+                    <h2 class="text-label-sm font-label-sm text-outline uppercase tracking-wider mb-2">Caracteres</h2>
+                    <p class="font-body-sm text-body-sm text-outline">Contará el texto plano y el que acaba pegado en LinkedIn.</p>
+                </section>
+                <section>
+                    <h2 class="text-label-sm font-label-sm text-outline uppercase tracking-wider mb-2">Borradores</h2>
+                    <p class="font-body-sm text-body-sm text-outline">Aún no hay borradores.</p>
+                </section>
+                <section>
+                    <h2 class="text-label-sm font-label-sm text-outline uppercase tracking-wider mb-2">Vista previa</h2>
+                    <p class="font-body-sm text-body-sm text-outline">Mostrará el corte de «…ver más» de LinkedIn.</p>
+                </section>
+                <div class="pt-6 border-t border-outline-variant/30">
+                    <a class="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors"
+                       href="#">Política de privacidad</a>
+                </div>
+            </div>
+        </details>
+    </aside>
 </div>
-<!-- BottomNavBar for Mobile (Visible only on md:hidden) -->
-<nav class="md:hidden fixed bottom-0 w-full bg-surface border-t border-outline-variant/30 flex justify-around items-center py-3 px-4 z-50 pb-safe">
-    <a class="flex flex-col items-center gap-1 text-primary" href="#">
-        <span class="material-symbols-outlined icon-fill">dashboard</span>
-        <span class="font-label-sm text-label-sm">Dashboard</span>
-    </a>
-    <a class="flex flex-col items-center gap-1 text-on-surface-variant hover:text-primary" href="#">
-        <span class="material-symbols-outlined">bar_chart</span>
-        <span class="font-label-sm text-label-sm">Analytics</span>
-    </a>
-    <a class="flex flex-col items-center gap-1 text-on-surface-variant hover:text-primary" href="#">
-        <span class="material-symbols-outlined">settings</span>
-        <span class="font-label-sm text-label-sm">Settings</span>
-    </a>
-</nav>
 <script type="module" src="/static/js/main.js" defer></script>
 </body>
 </html>

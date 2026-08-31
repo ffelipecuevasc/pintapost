@@ -26,6 +26,10 @@ yarn-debug.log
 out/
 public/static/css/tailwind.css
 
+# Fuentes copiadas por `pnpm run build:fonts` desde node_modules (ADR-010).
+# Son artefacto de build, como tailwind.css: no se versionan.
+public/static/assets/fonts/
+
 # Estado local de Wrangler (generado por `wrangler dev`)
 .wrangler/
 
