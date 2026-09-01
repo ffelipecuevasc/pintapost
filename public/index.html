@@ -67,37 +67,45 @@
             <!-- Tarjeta del editor -->
             <section
                     class="card flex flex-col">
-                <!-- Barra de herramientas. Los botones son cascarones: la
-                     lógica de formato llega en el S04. -->
+                <!-- Barra de herramientas. `data-command` es lo que conecta
+                     cada botón con su comando en editor.js; el editor sincroniza
+                     aria-pressed y data-state con la selección. -->
                 <div class="flex items-center gap-1 p-3 border-b border-outline-variant/30 bg-surface-bright rounded-t-xl overflow-x-auto no-scrollbar"
-                     role="toolbar" aria-label="Formato de texto">
+                     id="toolbar" role="toolbar" aria-label="Formato de texto">
                     <button class="icon-button" type="button" aria-pressed="false"
-                            aria-label="Negrita" title="Negrita">
+                            data-command="bold"
+                            aria-label="Negrita" title="Negrita (Ctrl+B)">
                         <svg class="w-5 h-5" aria-hidden="true"><use href="/static/assets/icons.svg#bold"></use></svg>
                     </button>
                     <button class="icon-button" type="button" aria-pressed="false"
-                            aria-label="Cursiva" title="Cursiva">
+                            data-command="italic"
+                            aria-label="Cursiva" title="Cursiva (Ctrl+I)">
                         <svg class="w-5 h-5" aria-hidden="true"><use href="/static/assets/icons.svg#italic"></use></svg>
                     </button>
                     <button class="icon-button" type="button" aria-pressed="false"
-                            aria-label="Subrayado" title="Subrayado">
+                            data-command="underline"
+                            aria-label="Subrayado" title="Subrayado (Ctrl+U)">
                         <svg class="w-5 h-5" aria-hidden="true"><use href="/static/assets/icons.svg#underline"></use></svg>
                     </button>
                     <button class="icon-button" type="button" aria-pressed="false"
+                            data-command="strikethrough"
                             aria-label="Tachado" title="Tachado">
                         <svg class="w-5 h-5" aria-hidden="true"><use href="/static/assets/icons.svg#strikethrough"></use></svg>
                     </button>
                     <div class="w-px h-6 shrink-0 bg-outline-variant/50 mx-1" role="separator" aria-orientation="vertical"></div>
                     <button class="icon-button" type="button"
+                            data-command="bullet"
                             aria-label="Lista con viñetas" title="Lista con viñetas">
                         <svg class="w-5 h-5" aria-hidden="true"><use href="/static/assets/icons.svg#list-bulleted"></use></svg>
                     </button>
                     <button class="icon-button" type="button"
+                            data-command="numbered"
                             aria-label="Lista numerada" title="Lista numerada">
                         <svg class="w-5 h-5" aria-hidden="true"><use href="/static/assets/icons.svg#list-numbered"></use></svg>
                     </button>
                     <div class="w-px h-6 shrink-0 bg-outline-variant/50 mx-1" role="separator" aria-orientation="vertical"></div>
                     <button class="icon-button" type="button"
+                            data-command="clear"
                             aria-label="Limpiar formato" title="Limpiar formato">
                         <svg class="w-5 h-5" aria-hidden="true"><use href="/static/assets/icons.svg#clear-format"></use></svg>
                     </button>

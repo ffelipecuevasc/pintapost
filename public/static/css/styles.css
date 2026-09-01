@@ -271,6 +271,28 @@ body {
     hover:bg-surface-container hover:text-primary;
 }
 
+/* Botón de formato activo: toda la selección lleva ese estilo.
+
+   El selector es `aria-pressed` y no una clase propia a propósito. El atributo
+   que anuncia el lector de pantalla y el que pinta el botón son el mismo, así
+   que no pueden desincronizarse: si alguna vez el botón se ve activo pero el
+   lector dice lo contrario, es que el bug está en editor.js y no en dos
+   fuentes de verdad que se han separado. Solo los botones de la barra llevan
+   el atributo; el de tema y el de GitHub no, y quedan fuera. */
+.icon-button[aria-pressed="true"] {
+  @apply bg-primary-container text-on-primary-container
+    hover:bg-primary-container hover:text-on-primary-container;
+}
+
+/* Tercer estado: la selección tiene el estilo a medias. `aria-pressed` es
+   booleano y no sabe expresarlo —se queda en "true", que es lo correcto para
+   el lector: pulsar quitará el estilo—, así que el matiz visual va por
+   `data-state`, que el editor sincroniza en la misma pasada. */
+.icon-button[data-state="partial"] {
+  @apply bg-primary-container/40 text-on-primary-container
+    hover:bg-primary-container/40;
+}
+
 /* =========================================================================
    4. UTILIDADES
    ========================================================================= */

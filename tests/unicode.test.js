@@ -18,6 +18,7 @@ import {
   stripStyling,
   isStyleable,
 } from "../public/static/js/format/unicode.js";
+import { count } from "../public/static/js/format/counting.js";
 
 // ── Constantes de referencia (ADR-004) ─────────────────────────────────────
 
@@ -582,5 +583,139 @@ describe("toStyled sigue siendo estricto", () => {
         );
       }
     }
+  });
+});
+
+// ── Opción de máxima compatibilidad (ADR-018) ──────────────────────────────
+
+describe("styleCombining", () => {
+  const SIN_DIACRITICAS = { bold: true, styleCombining: false };
+
+  test("por defecto está activo: no cambia nada de lo anterior", () => {
+    for (const texto of CORPUS) {
+      for (const style of ESTILOS) {
+        assert.equal(
+          toStyled(texto, { ...style, styleCombining: true }),
+          toStyled(texto, style),
+          `estilo ${JSON.stringify(style)} sobre ${JSON.stringify(texto)}`,
+        );
+      }
+    }
+  });
+
+  test('"canción": la ó sale en plano y el resto en negrita', () => {
+    const salida = toStyled("canción", SIN_DIACRITICAS);
+
+    // Las seis letras sin tilde sí se transforman…
+    assert.equal(
+      salida,
+      shifted("c", BOLD_LOWER) +
+        shifted("a", BOLD_LOWER) +
+        shifted("n", BOLD_LOWER) +
+        shifted("c", BOLD_LOWER) +
+        shifted("i", BOLD_LOWER) +
+        "ó" +
+        shifted("n", BOLD_LOWER),
+    );
+
+    // …y la ó queda tal cual llegó: precompuesta, un solo codepoint, fuera del
+    // bloque matemático. Si saliera descompuesta ("o" + U+0301) se vería igual
+    // pero costaría una unidad UTF-16 de más, que es lo que la opción ahorra.
+    assert.ok(salida.includes("ó"));
+    assert.equal([...salida].length, 7);
+  });
+
+  test("la regla es amplia: alcanza a ñ, ü y a las diacríticas ajenas", () => {
+    // ñ y ü se renderizan bien en los cinco entornos, pero entran igual: la
+    // regla de ADR-018 es "si lleva algo encima, no se toca".
+    for (const letra of "áéíóúüñÁÉÍÓÚÜÑàêïõç") {
+      assert.equal(
+        toStyled(letra, SIN_DIACRITICAS),
+        letra,
+        `${letra} debería salir sin transformar`,
+      );
+    }
+  });
+
+  test("las letras sin diacrítica sí se estilizan en el mismo texto", () => {
+    const salida = toStyled("El señor Muñoz añadió 42 ideas", SIN_DIACRITICAS);
+    assert.ok(salida.startsWith(shifted("E", BOLD_UPPER)));
+    assert.ok(salida.includes("ñ"));
+    assert.ok(salida.includes(shifted("z", BOLD_LOWER)));
+    // Los dígitos no llevan diacrítica: siguen recibiendo la negrita.
+    assert.ok(salida.includes(String.fromCodePoint(BOLD_DIGITS + 4)));
+  });
+
+  test("el subrayado y el tachado SÍ se aplican: son estilo, no idioma", () => {
+    const subrayada = toStyled("ó", {
+      ...SIN_DIACRITICAS,
+      underline: true,
+    });
+    assert.ok(subrayada.includes(UNDERLINE));
+    assert.ok(!subrayada.includes(String.fromCodePoint(BOLD_LOWER + 14))); // 𝗼
+
+    const tachada = toStyled("ó", {
+      ...SIN_DIACRITICAS,
+      strikethrough: true,
+    });
+    assert.ok(tachada.includes(STRIKETHROUGH));
+
+    // La tilde sobrevive a las dos marcas de estilo.
+    assert.equal(stripStyling(subrayada), "ó");
+    assert.equal(stripStyling(tachada), "ó");
+  });
+
+  test("round-trip: stripStyling revierte todo el corpus con la opción", () => {
+    for (const texto of CORPUS) {
+      for (const style of ESTILOS) {
+        const sin = { ...style, styleCombining: false };
+        assert.equal(
+          stripStyling(toStyled(texto, sin)),
+          texto,
+          `estilo ${JSON.stringify(sin)} sobre ${JSON.stringify(texto)}`,
+        );
+      }
+    }
+  });
+
+  test("sigue siendo idempotente con la opción desactivada", () => {
+    for (const texto of CORPUS) {
+      for (const style of ESTILOS) {
+        const sin = { ...style, styleCombining: false };
+        const unaVez = toStyled(texto, sin);
+        assert.equal(toStyled(unaVez, sin), unaVez);
+      }
+    }
+  });
+
+  test("ocupa menos unidades UTF-16 que con la opción activa (ADR-012)", () => {
+    const frase = "¿Cómo estás? El señor Muñoz añadió más información.";
+
+    const conDiacriticas = count(toStyled(frase, BOLD)).utf16;
+    const sinDiacriticas = count(toStyled(frase, SIN_DIACRITICAS)).utf16;
+
+    assert.ok(
+      sinDiacriticas < conDiacriticas,
+      `${sinDiacriticas} debería ser menor que ${conDiacriticas}`,
+    );
+
+    // El ahorro es exactamente 2 unidades por letra acentuada: la base deja de
+    // ser un par subrogado (2 → 1) y la marca combinable desaparece (1 → 0).
+    const acentuadas = [...frase].filter((ch) =>
+      /\p{M}/u.test(ch.normalize("NFD").slice(1)),
+    ).length;
+    assert.ok(acentuadas > 0, "la frase de prueba debe llevar tildes");
+    assert.equal(conDiacriticas - sinDiacriticas, acentuadas * 2);
+
+    // Los grafemas no cambian: el usuario ve las mismas letras.
+    assert.equal(
+      count(toStyled(frase, SIN_DIACRITICAS)).graphemes,
+      count(toStyled(frase, BOLD)).graphemes,
+    );
+  });
+
+  test("los emojis siguen atravesando la opción intactos", () => {
+    const emojis = "😀 👨‍👩‍👧 🇨🇱 👍🏽 1️⃣";
+    assert.equal(stripStyling(toStyled(emojis, SIN_DIACRITICAS)), emojis);
   });
 });

@@ -42,6 +42,20 @@
  * ADR-003 prohíbe. Una función que solo sabe deshacer lo que ella misma hizo no
  * sirve para limpiar lo que llega de fuera.
  *
+ * ── La opción de máxima compatibilidad ─────────────────────────────────────
+ *
+ * `toStyled` acepta `styleCombining` en el objeto de estilo. Vale `true` por
+ * defecto: todo se estiliza, incluidas las letras acentuadas, que es el
+ * comportamiento que este archivo describe en el algoritmo de arriba.
+ *
+ * Con `styleCombining: false`, cualquier grafema que tras NFD necesite marcas
+ * combinables se emite sin transformar, y el resto del texto sí se estiliza.
+ * Resuelve dos problemas de un tiro (ADR-018): la tilde sobre una base
+ * matemática se descoloca en Chrome de escritorio —el riesgo que ADR-005 dejó
+ * aceptado, materializado en uno de los cinco entornos—, y una vocal acentuada
+ * en negrita cuesta 3 unidades UTF-16 frente a 1 en plano, que es la moneda con
+ * la que LinkedIn mide el límite de 3.000 (ADR-012).
+ *
  * ── Por qué NFD y no una tabla de letras base ──────────────────────────────
  *
  * El bloque matemático no define ninguna letra acentuada y nunca lo hará, así
@@ -109,6 +123,15 @@ const EMOJI_MODIFIER = /\p{Emoji_Modifier}/u;
 
 /** Marcas combinables (tildes, virgulillas…) y modificadores de tono de piel. */
 const GRAPHEME_TRAILER = /\p{M}|\p{Emoji_Modifier}/u;
+
+/**
+ * Marcas combinables a secas, sin los modificadores de emoji.
+ *
+ * Es lo que distingue una letra acentuada de una letra pelada después de NFD,
+ * y por tanto lo que decide qué grafemas quedan fuera de la transformación
+ * cuando `styleCombining` es `false` (ADR-018).
+ */
+const COMBINING_MARK = /\p{M}/u;
 
 function isRegionalIndicator(codepoint) {
   return codepoint >= REGIONAL_FIRST && codepoint <= REGIONAL_LAST;
@@ -242,8 +265,39 @@ function addCombiningMarks(styled, cluster, style) {
   return out;
 }
 
+/**
+ * ¿Este grafema queda fuera de la transformación por la opción de máxima
+ * compatibilidad? (ADR-018)
+ *
+ * Con `styleCombining: false`, cualquier grafema que tras NFD necesite una o
+ * más marcas combinables se queda sin estilizar. La regla es deliberadamente
+ * amplia: alcanza a ñ y ü, que se renderizan bien en los cinco entornos, y no
+ * solo a las vocales con acento agudo, que son las que se descolocan en Chrome
+ * de escritorio. Una regla que cabe en una frase —"si lleva algo encima, no se
+ * toca"— se recuerda; una lista de excepciones por diacrítica, no.
+ */
+function keepsBaseIntact(cluster, style) {
+  return (
+    style.styleCombining === false &&
+    COMBINING_MARK.test(cluster.normalize("NFD"))
+  );
+}
+
 /** Aplica el estilo a un grafema completo. Pasos 2 a 5 del algoritmo. */
 function styleGrapheme(cluster, block, style) {
+  // Modo de máxima compatibilidad: el grafema sale **tal y como llegó**, sin
+  // descomponer. Devolverlo en NFD costaría una unidad UTF-16 de más por cada
+  // letra acentuada ("ó" precompuesta ocupa 1; "o" + U+0301, 2), que es justo
+  // la mitad del ahorro que esta opción viene a conseguir (ADR-018, motivo b).
+  // El subrayado y el tachado sí se añaden: son marcas de estilo, no
+  // diacríticas del idioma, y su sitio no depende del bloque de la base.
+  if (!isEmojiSequence(cluster) && keepsBaseIntact(cluster, style)) {
+    const marked = addCombiningMarks(cluster, cluster, style);
+    // Sin marcas añadidas no hay nada que reordenar y se conserva la forma
+    // original; con ellas sí, por el mismo motivo de orden canónico de abajo.
+    return marked === cluster ? cluster : marked.normalize("NFD");
+  }
+
   let out = "";
 
   if (isEmojiSequence(cluster)) {
@@ -271,7 +325,13 @@ function styleGrapheme(cluster, block, style) {
  *
  * @param {string} text Texto latino normal.
  * @param {{bold?: boolean, italic?: boolean, underline?: boolean,
- *          strikethrough?: boolean}} style
+ *          strikethrough?: boolean, styleCombining?: boolean}} style
+ *   `styleCombining` vale `true` por defecto y es la opción de máxima
+ *   compatibilidad de ADR-018: con `false`, las letras que llevan diacrítica
+ *   (á é í ó ú ñ ü y cualquier otra latina acentuada) salen sin estilizar y el
+ *   resto del texto sí recibe el estilo. Evita que la tilde se descoloque en
+ *   Chrome de escritorio y abarata el recuento UTF-16 que mide LinkedIn
+ *   (ADR-012). El subrayado y el tachado se aplican en los dos modos.
  * @returns {string} Cadena nueva. Cualquier carácter sin mapeo pasa intacto:
  *   ¿ ¡ º ª « » €, guiones largos, comillas tipográficas, espacios, saltos de
  *   línea y emojis.
