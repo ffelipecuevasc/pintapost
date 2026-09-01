@@ -34,15 +34,27 @@
  * inserta el prefijo de la primera línea, los de todas las demás dejan de ser
  * válidos. Recorrer al revés evita recalcular nada: una edición en la línea
  * cinco no mueve el principio de la línea dos.
+ *
+ * ── Las dos piezas que no son comandos ─────────────────────────────────────
+ *
+ * `applyStyleSet` y `dropText` viven aquí aunque no las llame ningún botón.
+ * Son la parte pura de las dos entradas al editor que no pasan por la barra
+ * —escribir con un estilo pendiente (X-31) y soltar texto con el ratón
+ * (X-32)—, y están aquí por el mismo motivo que el resto: para que la lógica
+ * que se puede equivocar tenga test, y `editor.js` se quede en cablear
+ * eventos.
  */
 
 "use strict";
 
 import {
+  applyStyle,
   clearStyles,
   deleteRange,
   insertText,
   normalize,
+  removeStyle,
+  STYLES,
   toggleStyle,
 } from "./model.js";
 import { stripStyling } from "../format/unicode.js";
@@ -169,6 +181,78 @@ export function insertPlainText(model, selection, text) {
  */
 export function cleanPastedText(text) {
   return stripStyling(text.replace(/\r\n?/g, "\n"));
+}
+
+/**
+ * Deja el tramo `[from, to)` con **exactamente** estos estilos: aplica los que
+ * están en la lista y quita los que no. Es la parte pura del estilo pendiente
+ * (X-31).
+ *
+ * Que quite y no solo añada es lo que hace falta para el caso simétrico:
+ * con el cursor dentro de una palabra en negrita, pulsar negrita significa que
+ * lo siguiente que escriba salga **sin** negrita, y `insertText` la habría
+ * heredado por estar la posición dentro del rango.
+ *
+ * @param {import("./model.js").Model} model
+ * @param {number} from
+ * @param {number} to
+ * @param {Iterable<import("./model.js").Style>} styles
+ * @returns {import("./model.js").Model}
+ */
+export function applyStyleSet(model, from, to, styles) {
+  const wanted = new Set(styles);
+
+  let result = model;
+  for (const style of STYLES) {
+    result = wanted.has(style)
+      ? applyStyle(result, from, to, style)
+      : removeStyle(result, from, to, style);
+  }
+  return result;
+}
+
+/**
+ * Inserta texto soltado con el ratón en la posición `at` (X-32).
+ *
+ * Con `source`, el gesto es **mover**, no copiar: el texto venía de dentro del
+ * propio editor y hay que borrarlo de su sitio. Es la diferencia entre esto y
+ * `insertPlainText`, y el motivo de que no baste con reutilizar el pegado tal
+ * cual: interceptar `drop` le quita al navegador el borrado del origen, que
+ * hacía él solo, y sin devolvérselo arrastrar dentro del editor duplicaría el
+ * texto en vez de moverlo.
+ *
+ * Soltar **dentro del propio tramo arrastrado** no hace nada, que es lo que
+ * hacen los navegadores: no hay ningún sitio nuevo al que llevarlo.
+ *
+ * @param {import("./model.js").Model} model
+ * @param {number} at posición de la caída
+ * @param {string} text ya limpio, ver `cleanPastedText`
+ * @param {{ from: number, to: number } | null} [source] tramo de origen si el
+ *   arrastre empezó dentro del editor
+ * @returns {{ model: import("./model.js").Model, selection: { from: number, to: number } }}
+ */
+export function dropText(model, at, text, source = null) {
+  const position = Math.max(0, Math.min(at, model.text.length));
+
+  if (!source || source.from === source.to) {
+    return insertPlainText(model, { from: position, to: position }, text);
+  }
+
+  const { from, to } = order(source);
+  if (position > from && position < to) {
+    return { model: normalize(model), selection: { from, to } };
+  }
+
+  // El destino se calcula **antes** de borrar y se corrige después: si el
+  // origen estaba delante, todo lo que venía detrás se ha movido hacia la
+  // izquierda tantas posiciones como caracteres se han quitado.
+  const target = position >= to ? position - (to - from) : position;
+
+  return insertPlainText(
+    deleteRange(model, from, to),
+    { from: target, to: target },
+    text,
+  );
 }
 
 // ── Listas ─────────────────────────────────────────────────────────────────

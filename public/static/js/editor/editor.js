@@ -14,7 +14,14 @@
  *   El usuario teclea        DOM → modelo      NO se re-renderiza
  *   Negrita, listas, limpiar modelo → DOM      sí
  *   Pegar                    modelo → DOM      sí
+ *   Soltar texto arrastrado  modelo → DOM      sí
  *   Deshacer / rehacer       modelo → DOM      sí
+ *
+ * Hay **una** excepción a la primera fila, y conviene saberla: cuando el
+ * usuario pulsa negrita sin seleccionar nada y se pone a escribir, el carácter
+ * recién tecleado tiene que verse en negrita, así que ahí sí se repinta. Es un
+ * repintado aislado que consume el estilo pendiente y desaparece (X-31), no un
+ * vuelco a repintar en cada pulsación.
  *
  * Al teclear, el navegador ya hace exactamente lo que hay que hacer: inserta el
  * carácter, mueve el cursor y mantiene abierta la composición de una tecla
@@ -44,12 +51,19 @@
 
 "use strict";
 
-import { createModel, hasStyle, STYLES } from "./model.js";
+import { createModel, hasStyle, STYLES, stylesAt } from "./model.js";
 import { render } from "./render.js";
-import { getSelection, readModelFromDom, setSelection } from "./selection.js";
 import {
+  domToModelOffset,
+  getSelection,
+  readModelFromDom,
+  setSelection,
+} from "./selection.js";
+import {
+  applyStyleSet,
   cleanPastedText,
   clearFormatting,
+  dropText,
   insertPlainText,
   toggleBulletList,
   toggleNumberedList,
@@ -75,13 +89,14 @@ const SELECTION_DEBOUNCE_MS = 50;
 /** El bloque prohibido dentro del modelo: Mathematical Alphanumeric Symbols. */
 const MATH_ALPHANUMERIC = /[\u{1D400}-\u{1D7FF}]/u;
 
-/** Qué comando ejecuta cada botón de la barra. Todos son `(model, selection)`. */
+/**
+ * Los comandos que no son de estilo. Todos son `(model, selection)` puros.
+ *
+ * Los cuatro estilos no están aquí: pasan por `toggleStyleCommand`, que
+ * decide entre alternar sobre la selección o armar un estilo pendiente segun
+ * haya o no texto seleccionado.
+ */
 const COMMANDS = {
-  bold: (model, selection) => toggleTextStyle(model, selection, "bold"),
-  italic: (model, selection) => toggleTextStyle(model, selection, "italic"),
-  underline: (model, selection) => toggleTextStyle(model, selection, "underline"),
-  strikethrough: (model, selection) =>
-    toggleTextStyle(model, selection, "strikethrough"),
   bullet: toggleBulletList,
   numbered: toggleNumberedList,
   clear: clearFormatting,
@@ -120,6 +135,20 @@ export function createEditor(root, options = {}) {
   /** La última selección buena que hubo dentro del editor. Ver `currentSelection`. */
   let lastSelection = null;
 
+  /**
+   * Estilo pendiente (X-31): el conjunto de estilos con el que saldrá lo
+   * siguiente que se escriba, y la posición en la que se armó. `null` = no hay
+   * ninguno armado, que es el caso normal.
+   */
+  let pendingStyles = null;
+  let pendingAt = null;
+
+  /**
+   * Tramo que se está arrastrando, cuando el arrastre empezó dentro del propio
+   * editor (X-32). Distingue mover de copiar.
+   */
+  let dragSource = null;
+
   // ── Pintar y leer ────────────────────────────────────────────────────────
 
   /** Modelo → DOM. El único sitio del editor que asigna `innerHTML`. */
@@ -133,6 +162,7 @@ export function createEditor(root, options = {}) {
    * No repinta: ese es justamente el motivo de que exista.
    */
   function readFromDom() {
+    const before = pending;
     model = readModelFromDom(root);
 
     // El estado previo se consume aquí y no sobrevive al cambio. Si en algún
@@ -142,6 +172,7 @@ export function createEditor(root, options = {}) {
     // posición exacta del cursor que apilar un estado equivocado.
     pending = null;
 
+    consumePendingStyles(before);
     guardAgainstStyledText();
     syncPlaceholder();
     announceChange();
@@ -207,6 +238,103 @@ export function createEditor(root, options = {}) {
     syncToolbar();
   }
 
+  // ── Estilo pendiente (X-31) ─────────────────────────────────────────────
+
+  /**
+   * Los cuatro botones de estilo. Con texto seleccionado alternan el estilo;
+   * con el cursor colapsado **arman un estilo pendiente**.
+   *
+   * Pulsar negrita sin seleccionar nada y ponerse a escribir es la forma
+   * habitual de usar un botón de negrita, no un borde raro. Antes no hacía
+   * nada porque `toggleStyle` no tiene caracteres sobre los que trabajar; la
+   * intención del usuario, sin embargo, es perfectamente clara y va sobre el
+   * texto que todavía no existe.
+   *
+   * @param {import("./model.js").Style} style
+   */
+  function toggleStyleCommand(style) {
+    const selection = currentSelection();
+
+    if (selection.from !== selection.to) {
+      clearPendingStyles();
+      apply((current, range) => toggleTextStyle(current, range, style));
+      return;
+    }
+
+    togglePendingStyle(style, selection.from);
+  }
+
+  /**
+   * Arma, desarma o cambia el estilo pendiente en la posición del cursor.
+   *
+   * El conjunto **arranca de lo que el cursor ya hereda**, no de vacío. Con el
+   * cursor dentro de una palabra en negrita, pulsar negrita significa «lo
+   * siguiente sin negrita», y eso solo se puede expresar si el conjunto sabe
+   * también lo que hay que quitar. Por eso `applyStyleSet` fija el conjunto
+   * exacto en lugar de limitarse a añadir.
+   *
+   * @param {import("./model.js").Style} style
+   * @param {number} at
+   */
+  function togglePendingStyle(style, at) {
+    if (pendingStyles === null || pendingAt !== at) {
+      pendingStyles = new Set(stylesAt(model, at, at));
+      pendingAt = at;
+    }
+
+    if (pendingStyles.has(style)) pendingStyles.delete(style);
+    else pendingStyles.add(style);
+
+    // Si lo armado coincide con lo que el cursor heredaba, no hay nada
+    // pendiente: pulsar dos veces el mismo botón deja las cosas como estaban.
+    if (sameStyleSet(pendingStyles, stylesAt(model, at, at))) {
+      clearPendingStyles();
+    }
+
+    syncToolbar();
+  }
+
+  function clearPendingStyles() {
+    pendingStyles = null;
+    pendingAt = null;
+  }
+
+  /**
+   * Aplica el estilo pendiente al texto que el navegador acaba de insertar.
+   *
+   * Es el único momento en que se repinta a raíz de una tecla, y no hay forma
+   * de evitarlo: el carácter recién escrito tiene que verse ya en negrita. Es
+   * un repintado aislado —el estilo pendiente se consume aquí y desaparece—,
+   * no un vuelco a repintar en cada pulsación.
+   *
+   * Se exige que el cambio haya sido una **inserción limpia** en la posición
+   * armada. Cualquier otra cosa (un borrado, una edición en otro sitio, un
+   * `beforeinput` que no llegó) descarta lo pendiente en vez de arriesgarse a
+   * pintar de negrita un tramo que no toca.
+   *
+   * @param {{ model: import("./model.js").Model,
+   *           selection: { from: number, to: number } } | null} before
+   */
+  function consumePendingStyles(before) {
+    if (pendingStyles === null) return;
+
+    const at = pendingAt;
+    if (!before || !isCleanInsertionAt(before.model.text, model.text, at)) {
+      clearPendingStyles();
+      return;
+    }
+
+    const grown = model.text.length - before.model.text.length;
+    const styled = applyStyleSet(model, at, at + grown, pendingStyles);
+    clearPendingStyles();
+
+    if (sameModel(styled, model)) return;
+
+    model = styled;
+    paint();
+    setSelection(root, at + grown, at + grown);
+  }
+
   /**
    * Ejecuta un comando de la barra por su nombre. Devuelve el foco al editor:
    * tras poner negrita, lo natural es seguir escribiendo.
@@ -214,9 +342,16 @@ export function createEditor(root, options = {}) {
    * @param {string} name
    */
   function execute(name) {
+    if (STYLES.includes(name)) {
+      toggleStyleCommand(name);
+      root.focus();
+      return;
+    }
+
     const command = COMMANDS[name];
     if (!command) return;
 
+    clearPendingStyles();
     apply(command);
     root.focus();
   }
@@ -304,11 +439,13 @@ export function createEditor(root, options = {}) {
 
   function undoStep() {
     endTypingBurst();
+    clearPendingStyles();
     restore(undo(history, { model, selection: currentSelection() }));
   }
 
   function redoStep() {
     endTypingBurst();
+    clearPendingStyles();
     restore(redo(history, { model, selection: currentSelection() }));
   }
 
@@ -365,7 +502,17 @@ export function createEditor(root, options = {}) {
       const button = toolbar.querySelector(`[data-command="${style}"]`);
       if (!button) continue;
 
-      const state = hasStyle(model, from, to, style);
+      // Mientras hay un estilo armado, los botones anuncian **la intención**,
+      // no lo que hay bajo el cursor: el usuario acaba de pulsar negrita y
+      // tiene que ver el botón activo hasta que escriba. Si no, parecería que
+      // la pulsación se ha perdido.
+      const state =
+        pendingStyles !== null
+          ? pendingStyles.has(style)
+            ? "all"
+            : "none"
+          : hasStyle(model, from, to, style);
+
       button.setAttribute("aria-pressed", state === "none" ? "false" : "true");
       button.dataset.state = state;
     }
@@ -430,12 +577,104 @@ export function createEditor(root, options = {}) {
    */
   function handlePaste(event) {
     event.preventDefault();
+    clearPendingStyles();
 
     const raw = event.clipboardData?.getData("text/plain") ?? "";
     const text = cleanPastedText(raw);
     if (text === "") return;
 
     apply((current, selection) => insertPlainText(current, selection, text));
+  }
+
+  /**
+   * Arrastrar y soltar (X-32). Era la única entrada al modelo que no pasaba ni
+   * por el teclado ni por `paste`: soltar un párrafo traído de otro formateador
+   * de LinkedIn metía caracteres del bloque matemático directamente en el DOM,
+   * y la guardia de ADR-003 tenía que limpiar el estropicio a posteriori.
+   *
+   * Ahora entra por el mismo camino que el pegado —`cleanPastedText` y
+   * `insertPlainText`—, así que la guardia vuelve a ser lo que debe ser: una
+   * red que no se pisa nunca.
+   *
+   * `dragover` hay que cancelarlo también, o el navegador ni siquiera considera
+   * el editor una zona donde se pueda soltar y `drop` no llega a dispararse.
+   *
+   * @param {DragEvent} event
+   */
+  function handleDragOver(event) {
+    event.preventDefault();
+  }
+
+  /**
+   * Recuerda de dónde salió el texto cuando el arrastre empieza dentro del
+   * editor. Sin esto no se puede distinguir mover de copiar: al cancelar el
+   * `drop` le quitamos al navegador el borrado del origen, que hacía él solo,
+   * y arrastrar una palabra de un sitio a otro la duplicaría.
+   */
+  function handleDragStart() {
+    const selection = getSelection(root);
+    dragSource = selection && selection.from !== selection.to ? selection : null;
+  }
+
+  function handleDragEnd() {
+    dragSource = null;
+  }
+
+  /**
+   * @param {DragEvent} event
+   */
+  function handleDrop(event) {
+    event.preventDefault();
+    clearPendingStyles();
+
+    const source = dragSource;
+    dragSource = null;
+
+    const raw = event.dataTransfer?.getData("text/plain") ?? "";
+    const text = cleanPastedText(raw);
+    if (text === "") return;
+
+    const at = dropOffset(event);
+    apply((current) => dropText(current, at, text, source));
+    root.focus();
+  }
+
+  /**
+   * Dónde ha caído el texto, en offsets del modelo.
+   *
+   * No hay una sola API para esto: `caretPositionFromPoint` es la estándar y
+   * `caretRangeFromPoint` la que llevan años teniendo los navegadores basados
+   * en WebKit y Blink. Si ninguna responde —o responde con un punto de fuera
+   * del editor— se cae al cursor actual, que deja el texto en un sitio
+   * razonable en vez de perderlo.
+   *
+   * @param {DragEvent} event
+   * @returns {number}
+   */
+  function dropOffset(event) {
+    const document_ = root.ownerDocument;
+    let node = null;
+    let offset = 0;
+
+    if (typeof document_.caretPositionFromPoint === "function") {
+      const position = document_.caretPositionFromPoint(
+        event.clientX,
+        event.clientY,
+      );
+      if (position) {
+        node = position.offsetNode;
+        offset = position.offset;
+      }
+    } else if (typeof document_.caretRangeFromPoint === "function") {
+      const range = document_.caretRangeFromPoint(event.clientX, event.clientY);
+      if (range) {
+        node = range.startContainer;
+        offset = range.startOffset;
+      }
+    }
+
+    if (!node || !root.contains(node)) return currentSelection().to;
+    return domToModelOffset(root, node, offset);
   }
 
   /**
@@ -473,7 +712,7 @@ export function createEditor(root, options = {}) {
     if (!style) return;
 
     event.preventDefault();
-    apply((current, selection) => toggleTextStyle(current, selection, style));
+    toggleStyleCommand(style);
   }
 
   /**
@@ -485,7 +724,30 @@ export function createEditor(root, options = {}) {
     // `contains` es cierto también para el propio elemento, que es el caso
     // normal: el foco vive en el `contenteditable`, no en sus hijos.
     if (!root.contains(root.ownerDocument.activeElement)) return;
+
+    // Mover el cursor a otro sitio descarta el estilo armado. Armarlo aquí y
+    // que siguiera vivo tres párrafos más abajo sería una sorpresa
+    // desagradable, y ningún procesador de textos lo hace.
+    //
+    // Solo descarta si el navegador dice de verdad dónde está el cursor. Una
+    // lectura vacía —que ocurre en el instante en que se devuelve el foco— no
+    // es una mudanza: tratarla como tal desarmaría el estilo justo después de
+    // pulsar el botón. Salir del editor de verdad lo cubre `handleBlur`.
+    if (pendingStyles !== null) {
+      const selection = getSelection(root);
+      const moved =
+        selection && (selection.from !== pendingAt || selection.to !== pendingAt);
+      if (moved) clearPendingStyles();
+    }
+
     scheduleToolbarSync();
+  }
+
+  /** Perder el foco también lo descarta: la intención era para «ahora». */
+  function handleBlur() {
+    if (pendingStyles === null) return;
+    clearPendingStyles();
+    syncToolbar();
   }
 
   // ── Cableado ────────────────────────────────────────────────────────────
@@ -496,6 +758,11 @@ export function createEditor(root, options = {}) {
   root.addEventListener("compositionend", handleCompositionEnd);
   root.addEventListener("paste", handlePaste);
   root.addEventListener("keydown", handleKeydown);
+  root.addEventListener("blur", handleBlur);
+  root.addEventListener("dragstart", handleDragStart);
+  root.addEventListener("dragend", handleDragEnd);
+  root.addEventListener("dragover", handleDragOver);
+  root.addEventListener("drop", handleDrop);
   root.ownerDocument.addEventListener("selectionchange", handleSelectionChange);
 
   if (toolbar) {
@@ -553,6 +820,46 @@ export function containsStyledText(text) {
  * @param {import("./model.js").Model} b
  * @returns {boolean}
  */
+/**
+ * ¿El paso de `before` a `after` fue una inserción limpia justo en `at`? Es
+ * decir: todo lo que había antes de `at` sigue igual, y todo lo que había
+ * después también, con texto nuevo intercalado en medio.
+ *
+ * Es la condición que tiene que cumplirse para aplicar un estilo pendiente sin
+ * riesgo. Un borrado, una autocorrección que reescribe la palabra entera o una
+ * edición en otro punto del texto la incumplen, y entonces vale más descartar
+ * lo armado que pintar de negrita un tramo equivocado.
+ *
+ * @param {string} before
+ * @param {string} after
+ * @param {number} at
+ * @returns {boolean}
+ */
+function isCleanInsertionAt(before, after, at) {
+  const grown = after.length - before.length;
+  if (grown <= 0) return false;
+  if (at < 0 || at > before.length) return false;
+
+  return (
+    after.slice(0, at) === before.slice(0, at) &&
+    after.slice(at + grown) === before.slice(at)
+  );
+}
+
+/**
+ * ¿Los mismos estilos en los dos conjuntos?
+ *
+ * @param {Set<string>} a
+ * @param {Iterable<string>} b
+ * @returns {boolean}
+ */
+function sameStyleSet(a, b) {
+  const other = new Set(b);
+  if (a.size !== other.size) return false;
+  for (const style of a) if (!other.has(style)) return false;
+  return true;
+}
+
 function sameModel(a, b) {
   if (a.text !== b.text) return false;
   if (a.ranges.length !== b.ranges.length) return false;

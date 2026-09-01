@@ -20,8 +20,10 @@ import {
   hasStyle,
 } from "../public/static/js/editor/model.js";
 import {
+  applyStyleSet,
   cleanPastedText,
   clearFormatting,
+  dropText,
   insertPlainText,
   toggleBulletList,
   toggleNumberedList,
@@ -417,5 +419,228 @@ describe("guion completo de edición", () => {
 
     assert.equal(getPlainText(estado.model), "• HoXXla mundo");
     assert.deepEqual(estado.model.ranges, []);
+  });
+});
+
+/**
+ * Estilo pendiente (X-31, S04 tarea 10).
+ *
+ * `applyStyleSet` es toda la parte de X-31 que se puede probar sin navegador:
+ * el resto —armar el conjunto al pulsar el botón, descartarlo al mover el
+ * cursor, consumirlo cuando el navegador inserta— vive en `editor.js` y se
+ * verifica a mano.
+ *
+ * Lo que se comprueba aquí es la propiedad de la que depende todo lo demás:
+ * tras pasar por `applyStyleSet`, el tramo tiene **exactamente** los estilos
+ * pedidos. Ni uno más, heredado del rango que lo rodea, ni uno menos.
+ */
+describe("estilo pendiente: applyStyleSet (X-31)", () => {
+  const TODOS = ["bold", "italic", "underline", "strikethrough"];
+
+  const estilosDe = (modelo, from, to) =>
+    TODOS.filter((estilo) => hasStyle(modelo, from, to, estilo) === "all");
+
+  test("aplica un estilo a un tramo que no tenía ninguno", () => {
+    const modelo = createModel("Hola mundo");
+    const resultado = applyStyleSet(modelo, 0, 4, ["bold"]);
+
+    assert.deepEqual(estilosDe(resultado, 0, 4), ["bold"]);
+    assert.equal(hasStyle(resultado, 4, 10, "bold"), "none");
+  });
+
+  test("aplica varios estilos a la vez", () => {
+    const modelo = createModel("Hola");
+    const resultado = applyStyleSet(modelo, 0, 4, ["bold", "italic"]);
+
+    assert.deepEqual(estilosDe(resultado, 0, 4), ["bold", "italic"]);
+  });
+
+  test("un conjunto vacío deja el tramo limpio", () => {
+    const modelo = createModel("Hola mundo", [
+      { start: 0, end: 10, style: "bold" },
+    ]);
+    const resultado = applyStyleSet(modelo, 0, 4, []);
+
+    assert.equal(hasStyle(resultado, 0, 4, "bold"), "none");
+    assert.equal(hasStyle(resultado, 4, 10, "bold"), "all");
+  });
+
+  test("QUITA lo que el tramo heredaba y no está en el conjunto", () => {
+    // El caso simétrico, y el motivo de que la función fije el conjunto exacto
+    // en vez de limitarse a añadir: con el cursor dentro de una palabra en
+    // negrita, el usuario pulsa negrita y lo que escriba debe salir SIN ella.
+    const modelo = createModel("negritanegrita", [
+      { start: 0, end: 14, style: "bold" },
+    ]);
+    const resultado = applyStyleSet(modelo, 7, 10, []);
+
+    assert.equal(hasStyle(resultado, 7, 10, "bold"), "none");
+    assert.equal(hasStyle(resultado, 0, 7, "bold"), "all");
+    assert.equal(hasStyle(resultado, 10, 14, "bold"), "all");
+  });
+
+  test("sustituye un estilo por otro en el mismo tramo", () => {
+    const modelo = createModel("Hola", [{ start: 0, end: 4, style: "bold" }]);
+    const resultado = applyStyleSet(modelo, 0, 4, ["italic"]);
+
+    assert.deepEqual(estilosDe(resultado, 0, 4), ["italic"]);
+  });
+
+  test("no toca el texto", () => {
+    const modelo = createModel("Hola mundo");
+    assert.equal(
+      getPlainText(applyStyleSet(modelo, 0, 4, ["bold", "underline"])),
+      "Hola mundo",
+    );
+  });
+
+  test("es idempotente", () => {
+    const modelo = createModel("Hola mundo");
+    const una = applyStyleSet(modelo, 2, 6, ["bold", "italic"]);
+    const dos = applyStyleSet(una, 2, 6, ["bold", "italic"]);
+
+    assert.deepEqual(dos, una);
+  });
+
+  test("un tramo vacío no cambia nada", () => {
+    const modelo = createModel("Hola", [{ start: 0, end: 4, style: "bold" }]);
+    assert.deepEqual(applyStyleSet(modelo, 2, 2, ["italic"]), modelo);
+  });
+
+  test("acepta un Set, no solo un array", () => {
+    const modelo = createModel("Hola");
+    const resultado = applyStyleSet(modelo, 0, 4, new Set(["bold"]));
+
+    assert.deepEqual(estilosDe(resultado, 0, 4), ["bold"]);
+  });
+
+  test("no muta el modelo original", () => {
+    const modelo = createModel("Hola", [{ start: 0, end: 4, style: "bold" }]);
+    const copia = structuredClone(modelo);
+    applyStyleSet(modelo, 0, 4, ["italic"]);
+
+    assert.deepEqual(modelo, copia);
+  });
+});
+
+/**
+ * Arrastrar y soltar (X-32, S04 tarea 10).
+ *
+ * `dropText` es la parte pura: dónde acaba el texto y qué pasa con el origen.
+ * Leer `dataTransfer` y averiguar sobre qué carácter ha caído el ratón son
+ * cosas del DOM, y viven en `editor.js`.
+ *
+ * La distinción que importa es copiar contra mover. Al interceptar `drop` le
+ * quitamos al navegador el borrado del origen, que hacía él solo; si no se lo
+ * devolvemos, arrastrar una palabra dentro del editor la duplica.
+ */
+describe("arrastrar y soltar: dropText (X-32)", () => {
+  test("sin origen es una copia: inserta y no borra nada", () => {
+    const modelo = createModel("Hola mundo");
+    const estado = dropText(modelo, 4, "XX");
+
+    assert.equal(getPlainText(estado.model), "HolaXX mundo");
+    assert.deepEqual(estado.selection, { from: 6, to: 6 });
+  });
+
+  test("inserta al principio y al final", () => {
+    const modelo = createModel("Hola");
+    assert.equal(getPlainText(dropText(modelo, 0, ">").model), ">Hola");
+    assert.equal(getPlainText(dropText(modelo, 4, "<").model), "Hola<");
+  });
+
+  test("una posición fuera de rango se recorta", () => {
+    const modelo = createModel("Hola");
+    assert.equal(getPlainText(dropText(modelo, 99, "!").model), "Hola!");
+    assert.equal(getPlainText(dropText(modelo, -5, "!").model), "!Hola");
+  });
+
+  test("con origen es un movimiento: borra de donde salió", () => {
+    // "uno dos tres": arrastrar "uno " (0–4) hasta el final.
+    const modelo = createModel("uno dos tres");
+    const estado = dropText(modelo, 12, "uno ", { from: 0, to: 4 });
+
+    assert.equal(getPlainText(estado.model), "dos tresuno ");
+  });
+
+  test("mover hacia atrás no descoloca el destino", () => {
+    // El origen está detrás del destino, así que borrarlo no lo mueve.
+    const modelo = createModel("uno dos tres");
+    const estado = dropText(modelo, 0, "tres", { from: 8, to: 12 });
+
+    assert.equal(getPlainText(estado.model), "tresuno dos ");
+  });
+
+  test("mover hacia delante corrige el destino por lo que se ha borrado", () => {
+    // Es el punto donde es fácil equivocarse: sin corregir el destino, el
+    // texto aterriza cuatro posiciones más a la derecha de lo debido.
+    const modelo = createModel("uno dos tres");
+    const estado = dropText(modelo, 8, "uno ", { from: 0, to: 4 });
+
+    assert.equal(getPlainText(estado.model), "dos uno tres");
+  });
+
+  test("soltar dentro del propio tramo arrastrado no hace nada", () => {
+    const modelo = createModel("uno dos tres");
+    const estado = dropText(modelo, 10, "s tre", { from: 8, to: 13 });
+
+    assert.equal(getPlainText(estado.model), "uno dos tres");
+    assert.deepEqual(estado.model.ranges, []);
+  });
+
+  test("un origen colapsado se trata como copia", () => {
+    const modelo = createModel("Hola");
+    const estado = dropText(modelo, 4, "!", { from: 2, to: 2 });
+
+    assert.equal(getPlainText(estado.model), "Hola!");
+  });
+
+  test("un origen al revés se ordena solo", () => {
+    // La selección llega invertida en cuanto el usuario arrastra hacia atrás.
+    const modelo = createModel("uno dos tres");
+    const estado = dropText(modelo, 12, "uno ", { from: 4, to: 0 });
+
+    assert.equal(getPlainText(estado.model), "dos tresuno ");
+  });
+
+  test("el texto movido entra plano, sin su estilo", () => {
+    // A propósito: `dropText` recibe una cadena, no un tramo del modelo,
+    // porque lo que suelta el navegador puede venir de cualquier sitio. Entrar
+    // plano es exactamente lo que hace el pegado (B-11).
+    const modelo = createModel("uno dos", [{ start: 0, end: 3, style: "bold" }]);
+    const estado = dropText(modelo, 7, "uno", { from: 0, to: 3 });
+
+    assert.equal(getPlainText(estado.model), " dosuno");
+    assert.equal(hasStyle(estado.model, 4, 7, "bold"), "none");
+  });
+
+  test("el estilo del texto que se queda no se descoloca", () => {
+    // "uno dos tres" con "tres" en negrita; se mueve "uno " al final. La
+    // negrita debe seguir sobre "tres", ahora en otras posiciones.
+    const modelo = createModel("uno dos tres", [
+      { start: 8, end: 12, style: "bold" },
+    ]);
+    const estado = dropText(modelo, 12, "uno ", { from: 0, to: 4 });
+
+    assert.equal(getPlainText(estado.model), "dos tresuno ");
+    assert.equal(hasStyle(estado.model, 4, 8, "bold"), "all");
+  });
+
+  test("no muta el modelo original", () => {
+    const modelo = createModel("uno dos", [{ start: 0, end: 3, style: "bold" }]);
+    const copia = structuredClone(modelo);
+    dropText(modelo, 7, "uno", { from: 0, to: 3 });
+
+    assert.deepEqual(modelo, copia);
+  });
+
+  test("lo que se suelta pasa por la misma limpieza que el pegado", () => {
+    // Es el motivo de existir de X-32: era la única entrada al modelo que no
+    // pasaba por el teclado ni por `paste`, y ADR-003 prohíbe que un carácter
+    // del bloque matemático llegue a `model.text`.
+    const limpio = cleanPastedText("\u{1D5DB}ola\r\nmundo");
+    const estado = dropText(createModel(""), 0, limpio);
+
+    assert.equal(getPlainText(estado.model), "Hola\nmundo");
   });
 });
