@@ -13,7 +13,9 @@ caracteres Unicode matemáticos. Estático, gratuito, sin login, sin base de dat
 - Todo el CSS vive en `public/static/css/styles.css`. Los `.html` solo llevan
   clases: prohibido `<style>` y el atributo `style=` inline (ADR-015).
 - JavaScript ES6+ nativo. **Cero dependencias de runtime.**
-- Dependencias de desarrollo permitidas: tailwindcss, esbuild, wrangler.
+- Dependencias de desarrollo permitidas: tailwindcss, esbuild, wrangler y
+  linkedom. Esta última **solo se importa desde `tests/`** (ADR-020): sirve para
+  probar `selection.js` contra un DOM real y nunca llega al navegador.
 - Tests con el runner nativo de Node (`node --test`). Sin Jest ni Vitest.
 - Despliegue: Cloudflare Workers + Static Assets. **No Pages.**
 - Todo lo publicable vive en `public/`, el directorio de assets. Lo que esté
