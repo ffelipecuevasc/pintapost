@@ -110,27 +110,11 @@
                         <svg class="w-5 h-5" aria-hidden="true"><use href="/static/assets/icons.svg#clear-format"></use></svg>
                     </button>
                 </div>
-                <!-- Zona con aspecto de publicación de LinkedIn -->
+                <!-- Zona de escritura. La cabecera de autor simulada que
+                     vivía aquí desde el S02 se mudó a la vista previa (S06,
+                     C-02), que es su sitio natural: el editor no imita a
+                     LinkedIn, lo imita la vista previa. -->
                 <div class="p-6 flex flex-col gap-4">
-                    <!-- Cabecera de autor simulada (germen de la vista previa, C-02) -->
-                    <div class="flex items-center gap-3">
-                        <div class="w-12 h-12 rounded-full bg-surface-container-high flex items-center justify-center overflow-hidden">
-                            <svg class="w-6 h-6 text-outline" aria-hidden="true"><use href="/static/assets/icons.svg#person"></use></svg>
-                        </div>
-                        <div>
-                            <div class="font-body-md text-body-md font-semibold text-on-surface leading-tight">Tu
-                                Nombre
-                            </div>
-                            <div class="font-body-sm text-body-sm text-outline leading-tight">Tu Titular Profesional •
-                                1er
-                            </div>
-                            <div class="flex items-center gap-1 font-label-sm text-label-sm text-outline mt-0.5">
-                                <span>Justo ahora</span>
-                                <span>•</span>
-                                <svg class="w-3.5 h-3.5" aria-hidden="true"><use href="/static/assets/icons.svg#globe"></use></svg>
-                            </div>
-                        </div>
-                    </div>
                     <!-- Área editable. Arranca con is-empty para que el
                          marcador de posición se vea antes de que corra el JS. -->
                     <div class="w-full min-h-[200px] outline-none font-body-md text-body-md text-on-surface whitespace-pre-wrap is-empty"
@@ -210,13 +194,60 @@
                         </span>
                     </label>
                 </section>
-                <section>
-                    <h2 class="text-label-sm font-label-sm text-outline uppercase tracking-wider mb-2">Borradores</h2>
-                    <p class="font-body-sm text-body-sm text-outline">Aún no hay borradores.</p>
+                <!-- Borrador automático (S06, C-01, ADR-017). Un solo borrador:
+                     la biblioteca con varios es X-06 y está aplazada. El estado
+                     lo escribe drafts.js en `data-state`. -->
+                <section class="drafts" id="drafts" data-state="empty">
+                    <h2 class="text-label-sm font-label-sm text-outline uppercase tracking-wider mb-2">Borrador</h2>
+                    <p class="drafts-status" id="drafts-status">Se guarda solo mientras escribes.</p>
+                    <button class="drafts-action" type="button" id="drafts-discard" hidden>Descartar borrador</button>
+                    <div class="drafts-confirm" id="drafts-confirm" hidden>
+                        <p class="drafts-confirm-question">¿Descartar el borrador? Esto vacía el editor y no se puede deshacer.</p>
+                        <div class="drafts-confirm-actions">
+                            <button class="drafts-action drafts-action-danger" type="button" id="drafts-discard-yes">Sí, descartar</button>
+                            <button class="drafts-action" type="button" id="drafts-discard-no">Cancelar</button>
+                        </div>
+                    </div>
+                    <p class="sr-only" id="drafts-live" role="status" aria-live="polite"></p>
                 </section>
-                <section>
+                <!-- Vista previa (S06, C-02). Renderiza la salida de
+                     serialize(), no el contenido del editor: lo que LinkedIn
+                     recibe son caracteres de otro bloque Unicode y ocupan otro
+                     ancho. El corte NO se mide aquí sino en .preview-ruler, que
+                     tiene el ancho real del feed. -->
+                <section class="preview" id="preview" data-mode="mobile" data-state="empty">
                     <h2 class="text-label-sm font-label-sm text-outline uppercase tracking-wider mb-2">Vista previa</h2>
-                    <p class="font-body-sm text-body-sm text-outline">Mostrará el corte de «…ver más» de LinkedIn.</p>
+                    <div class="preview-modes" id="preview-modes" role="group" aria-label="Ancho de la vista previa">
+                        <button class="preview-mode" type="button" data-mode="mobile" aria-pressed="true">Móvil</button>
+                        <button class="preview-mode" type="button" data-mode="desktop" aria-pressed="false">Escritorio</button>
+                    </div>
+                    <div class="preview-card">
+                        <!-- Cabecera de autor simulada, mudada del editor (S02 → S06). -->
+                        <div class="preview-author">
+                            <div class="preview-avatar">
+                                <svg class="w-4 h-4 text-outline" aria-hidden="true"><use href="/static/assets/icons.svg#person"></use></svg>
+                            </div>
+                            <div class="preview-author-text">
+                                <span class="preview-author-name">Tu Nombre</span>
+                                <span class="preview-author-headline">Tu Titular Profesional • 1er</span>
+                                <span class="preview-author-meta">
+                                    <span>Justo ahora</span>
+                                    <span aria-hidden="true">•</span>
+                                    <svg class="w-3 h-3" aria-hidden="true"><use href="/static/assets/icons.svg#globe"></use></svg>
+                                </span>
+                            </div>
+                        </div>
+                        <p class="preview-empty" id="preview-empty">Escribe algo y aquí verás cómo lo recibe LinkedIn.</p>
+                        <p class="preview-text" id="preview-visible" hidden></p>
+                        <p class="preview-more" id="preview-more" hidden>
+                            <span class="preview-more-label">…ver más</span>
+                            <span class="sr-only">Lo que sigue solo se ve si el lector pulsa «ver más».</span>
+                        </p>
+                        <p class="preview-text preview-text-hidden" id="preview-hidden" hidden></p>
+                    </div>
+                    <p class="preview-summary" id="preview-summary" hidden></p>
+                    <p class="preview-note">Solo vale para posts de <strong>solo texto</strong>. Con una imagen o
+                        un enlace, LinkedIn corta antes.</p>
                 </section>
                 <div class="pt-6 border-t border-outline-variant/30">
                     <a class="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors"
@@ -226,6 +257,14 @@
         </details>
     </aside>
 </div>
+<!-- La regla de la vista previa (S06, C-02). Invisible, con el ancho real de la
+     columna de texto del feed: aquí se mide dónde cae el «…ver más», no en la
+     tarjeta del panel, que en escritorio mide la mitad.
+
+     Vive fuera del <aside> a propósito. Dentro del <details> del panel, plegarlo
+     en móvil la dejaría sin layout y `getBoundingClientRect()` devolvería cero:
+     la vista previa se quedaría sin corte hasta la siguiente tecla. -->
+<div class="preview-ruler" id="preview-ruler" data-mode="mobile" aria-hidden="true"></div>
 <script type="module" src="/static/js/main.js" defer></script>
 </body>
 </html>

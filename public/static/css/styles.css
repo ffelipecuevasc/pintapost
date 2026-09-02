@@ -161,6 +161,24 @@
 
     /* --- Sombra de tarjeta (se usaba inline en el prototipo) ----------- */
   --shadow-card: 0 4px 12px rgb(15 23 42 / 0.05);
+
+    /* --- Vista previa de LinkedIn (S06, C-02) --------------------------- */
+    /* ⚠️ CONSTANTES DE CALIBRACIÓN. El ancho de la columna de **texto** de
+       una publicación en el feed, ya descontado el relleno de la tarjeta. Es
+       lo que mide `.preview-ruler`, y de ahí sale el corte de «…ver más».
+
+       Son aproximaciones observadas, no medidas: la tarea 9 del S06 las cuadra
+       contra el feed real. El número de líneas visibles vive en el objeto
+       LINKEDIN de `preview.js`; al calibrar hay que tocar los dos sitios.
+
+       No cambian con el tema: describen LinkedIn, no nuestra paleta. */
+  --preview-width-mobile:  358px;   /* teléfono de 390 pt menos 16 pt de margen */
+  --preview-width-desktop: 523px;   /* tarjeta de 555 px menos 16 px de relleno */
+
+    /* La pila del sistema, no Inter: LinkedIn no usa Inter, y aquí queremos
+       parecernos a LinkedIn. */
+  --font-linkedin: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
 }
 
   /* =======================================================================
@@ -380,6 +398,183 @@ body {
   @apply mt-1 block font-label-sm text-label-sm text-secondary;
 }
 
+/* --- Borrador automático (S06, C-01, ADR-017) ----------------------------
+   Cuatro estados en `data-state`, escritos por drafts.js: `empty` (nada que
+   guardar), `saved`, `restored` y `unavailable`. Solo el último cambia de
+   color: es el único que informa de algo que el usuario no ha pedido. */
+.drafts-status {
+  @apply font-body-sm text-body-sm text-outline;
+}
+
+.drafts[data-state="restored"] .drafts-status {
+  @apply text-on-surface-variant;
+}
+
+.drafts[data-state="unavailable"] .drafts-status {
+  @apply text-secondary;
+}
+
+/* Un botón con aspecto de enlace. No es una acción principal ni secundaria:
+   compite con «Copiar» y con la barra de herramientas por la atención del
+   usuario, y tiene que perder. */
+.drafts-action {
+  @apply mt-2 inline-flex items-center rounded font-label-sm text-label-sm
+    text-on-surface-variant underline underline-offset-2 transition-colors
+    hover:text-primary;
+}
+
+.drafts-action-danger {
+  @apply text-error hover:brightness-110;
+}
+
+.drafts-confirm {
+  @apply mt-2 flex flex-col gap-1 rounded-lg border border-outline-variant
+    bg-surface-container-low p-3;
+}
+
+.drafts-confirm-question {
+  @apply font-body-sm text-body-sm text-on-surface;
+}
+
+.drafts-confirm-actions {
+  @apply flex flex-wrap items-center gap-4;
+}
+
+.drafts-confirm-actions .drafts-action {
+  @apply mt-0;
+}
+
+/* --- Vista previa de LinkedIn (S06, C-02) --------------------------------
+   Dos estados en `data-state`: `empty`, `full` y `cut`. Y `data-mode`, que en
+   la tarjeta decide cómo se ve y en la regla decide **cuánto mide**. */
+
+/* El conmutador Móvil / Escritorio. Dos botones con aria-pressed, como los de
+   la barra de herramientas: el estado que anuncia el lector y el que pinta el
+   color son el mismo atributo. */
+.preview-modes {
+  @apply mb-3 inline-flex gap-1 rounded-lg bg-surface-container p-1;
+}
+
+.preview-mode {
+  @apply rounded-md px-3 py-1 font-label-sm text-label-sm text-on-surface-variant
+    transition-colors hover:text-primary;
+}
+
+.preview-mode[aria-pressed="true"] {
+  @apply bg-surface-container-lowest text-primary shadow-sm;
+}
+
+/* La tarjeta imita la publicación del feed, con su fondo propio: tiene que
+   leerse como algo ajeno a PintaPost, porque lo es. */
+.preview-card {
+  @apply w-full overflow-hidden rounded-lg border border-outline-variant
+    bg-surface-container-lowest p-3;
+}
+
+.preview[data-mode="mobile"] .preview-card {
+  max-width: calc(var(--preview-width-mobile) + 1.5rem);
+}
+
+.preview[data-mode="desktop"] .preview-card {
+  max-width: calc(var(--preview-width-desktop) + 1.5rem);
+}
+
+.preview-author {
+  @apply mb-2 flex items-center gap-2;
+}
+
+.preview-avatar {
+  @apply flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden
+    rounded-full bg-surface-container-high;
+}
+
+.preview-author-text {
+  @apply flex min-w-0 flex-col;
+}
+
+.preview-author-name {
+  @apply truncate font-label-md text-label-md font-semibold text-on-surface;
+}
+
+.preview-author-headline,
+.preview-author-meta {
+  @apply truncate font-label-sm text-label-sm text-outline;
+}
+
+.preview-author-meta {
+  @apply flex items-center gap-1;
+}
+
+/* El texto del post. Tipografía de LinkedIn, no la nuestra, y `pre-wrap`
+   porque los saltos de línea del usuario son parte del texto. */
+.preview-text,
+.preview-ruler {
+  font-family: var(--font-linkedin);
+  font-size: 14px;
+  line-height: 20px;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.preview-text {
+  @apply text-on-surface;
+}
+
+/* Lo que queda detrás del «…ver más». Atenuado, no oculto: la gracia es ver
+   cuánto texto se queda fuera del primer vistazo. */
+.preview-text-hidden {
+  @apply text-outline opacity-60;
+}
+
+/* La línea divisoria. Es la única cosa que esta vista previa tiene que hacer
+   bien, así que se dibuja, no se insinúa. */
+.preview-more {
+  @apply my-2 flex items-center gap-2 font-label-sm text-label-sm text-primary;
+}
+
+.preview-more::after {
+  content: "";
+  @apply h-px flex-1 bg-outline-variant;
+}
+
+.preview-empty {
+  @apply font-body-sm text-body-sm text-outline;
+}
+
+.preview-summary {
+  @apply mt-2 font-label-sm text-label-sm text-on-surface-variant;
+}
+
+.preview-note {
+  @apply mt-2 font-body-sm text-body-sm text-outline;
+}
+
+/* --- La regla de medición (S06, C-02) -----------------------------------
+   Invisible pero con layout: `visibility: hidden` mantiene las cajas, que es
+   justo lo que hace falta para medir; `display: none` no servíria.
+
+   `position: fixed` para que no la recorte ni la desplace el `overflow-y` del
+   panel lateral, y para que su ancho —mayor que un teléfono en modo
+   Escritorio— no le añada scroll horizontal a nadie. */
+.preview-ruler {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  visibility: hidden;
+  pointer-events: none;
+  padding: 0;
+  border: 0;
+}
+
+.preview-ruler[data-mode="mobile"] {
+  width: var(--preview-width-mobile);
+}
+
+.preview-ruler[data-mode="desktop"] {
+  width: var(--preview-width-desktop);
+}
+
 /* --- Copia manual: el tercer camino del portapapeles (S05, B-14) ---------
    No es un mensaje de error. Es el texto correcto, ya seleccionado, con la
    instrucción de llevárselo a mano. */
@@ -482,4 +677,23 @@ summary::-webkit-details-marker {
 [contenteditable="true"].is-empty::before {
   content: attr(data-placeholder);
   @apply pointer-events-none block text-outline;
+}
+
+/* =========================================================================
+   6. EL ATRIBUTO `hidden` GANA SIEMPRE  (S06)
+   -------------------------------------------------------------------------
+   Preflight declara `[hidden]:where(:not([hidden=until-found]))` con
+   especificidad (0,1,0), la misma que cualquier clase de componente, y sale
+   antes en el CSS compilado. Así que un `.manual-copy { @apply flex }` o un
+   `.drafts-confirm { @apply flex }` ganan por orden de aparición y el
+   elemento se ve aunque lleve `hidden`.
+
+   Es una trampa silenciosa: el marcado dice una cosa, el JS alterna la
+   propiedad correcta y en pantalla no pasa nada. Esta regla, al final del
+   archivo, la cierra para todo el proyecto en lugar de obligar a acordarse en
+   cada componente nuevo. Va sin `!important`: le basta con ser la última.
+   ========================================================================= */
+
+[hidden] {
+  display: none;
 }

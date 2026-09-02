@@ -20,7 +20,9 @@
  *   getOptions()  las opciones de serialización, que las guarda `settings`
  *
  * El orden de arranque no es libre: `createSettings` tiene que existir antes
- * que el contador y que el copiado, porque los dos preguntan por `getOptions`.
+ * que el contador y que el copiado, porque los dos preguntan por `getOptions`,
+ * y `setupDrafts` va el último porque al restaurar emite `pintapost:change`
+ * y necesita que los demás ya lo estén escuchando.
  */
 
 "use strict";
@@ -29,6 +31,8 @@ import { setupTheme } from "./theme.js";
 import { createEditor } from "./editor/editor.js";
 import { setupCopy } from "./export/clipboard.js";
 import { setupCounter } from "./ui/counter.js";
+import { setupDrafts } from "./ui/drafts.js";
+import { setupPreview } from "./ui/preview.js";
 import { createSettings } from "./ui/settings.js";
 
 /**
@@ -70,6 +74,35 @@ function setupEditor() {
     status: document.getElementById("copy-status"),
     manual: document.getElementById("copy-manual"),
     manualField: document.getElementById("copy-manual-field"),
+  });
+
+  setupPreview({
+    getModel,
+    getOptions: settings.getOptions,
+    root: document.getElementById("preview"),
+    ruler: document.getElementById("preview-ruler"),
+    modes: document.getElementById("preview-modes"),
+    visible: document.getElementById("preview-visible"),
+    hidden: document.getElementById("preview-hidden"),
+    more: document.getElementById("preview-more"),
+    empty: document.getElementById("preview-empty"),
+    summary: document.getElementById("preview-summary"),
+  });
+
+  // El último, y el orden importa: restaurar el borrador emite
+  // `pintapost:change`, y el contador, la vista previa y los botones de copiar
+  // tienen que estar ya escuchando para reflejarlo. Si fuera el primero, el
+  // editor arrancaría con texto y el contador diciendo cero.
+  setupDrafts({
+    getModel,
+    setModel: editor.setModel,
+    root: document.getElementById("drafts"),
+    status: document.getElementById("drafts-status"),
+    discard: document.getElementById("drafts-discard"),
+    confirm: document.getElementById("drafts-confirm"),
+    confirmYes: document.getElementById("drafts-discard-yes"),
+    confirmNo: document.getElementById("drafts-discard-no"),
+    live: document.getElementById("drafts-live"),
   });
 }
 
