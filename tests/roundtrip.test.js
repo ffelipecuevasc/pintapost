@@ -193,3 +193,33 @@ describe("convergencia", () => {
     }
   });
 });
+
+/**
+ * _Añadida por Claude Code el 2026-09-01._
+ *
+ * El S05 hace que `render` envuelva los hashtags y las menciones en un
+ * `<span class="protected">` para avisar de que no van a recibir formato
+ * (ADR-013). El span va **por dentro** de `<strong>` y `<em>`, y no en su
+ * lugar, justamente para que el invariante de este archivo siga en pie: el
+ * modelo guarda la intención del usuario aunque el motor decida no honrarla.
+ *
+ * Si algún día alguien "simplifica" `render` quitando las etiquetas de estilo
+ * de los tramos protegidos, el editor perdería la negrita del hashtag en el
+ * primer repintado —en silencio, y sin que ningún otro test se entere— y el
+ * usuario la vería desaparecer al pulsar cualquier botón de la barra.
+ */
+describe("tramos protegidos: no rompen el invariante", () => {
+  const casos = [
+    createModel("Hola #Marketing mundo"),
+    createModel("Hola #Marketing mundo", [r(0, 21, "bold")]),
+    createModel("Gracias a @ana", [r(0, 14, "italic"), r(0, 14, "underline")]),
+    createModel("#uno #dos", [r(0, 9, "bold")]),
+    createModel("Cierre.\n\n#Growth #Ventas", [r(9, 24, "bold")]),
+  ];
+
+  for (const [indice, modelo] of casos.entries()) {
+    test(`${indice + 1}. "${modelo.text.replaceAll("\n", " / ")}"`, () => {
+      assert.deepEqual(roundTrip(modelo), modelo);
+    });
+  }
+});

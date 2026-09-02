@@ -293,6 +293,131 @@ body {
     hover:bg-primary-container/40;
 }
 
+/* --- Botones de acción (S05) ---------------------------------------------
+   El principal y el secundario comparten caja, altura y separación del icono;
+   solo cambian de color. Se declaran aquí y no como cadena de utilidades en el
+   HTML porque el patrón se repite y porque el estado :disabled —el editor
+   vacío— necesita una regla propia que el marcado no puede expresar. */
+.button-primary,
+.button-secondary {
+  @apply inline-flex items-center justify-center gap-2 shrink-0 rounded-lg
+    px-8 py-3 font-label-md text-label-md shadow-sm
+    transition-all active:scale-95;
+}
+
+.button-primary {
+  @apply bg-primary text-on-primary hover:brightness-110;
+}
+
+.button-secondary {
+  @apply bg-surface-container-high text-on-surface-variant
+    hover:bg-surface-container-highest hover:text-primary;
+}
+
+.button-primary:disabled,
+.button-secondary:disabled {
+  @apply cursor-not-allowed opacity-40 shadow-none;
+  filter: none;
+  transform: none;
+}
+
+/* --- Contador dual (S05, B-16, ADR-012) ----------------------------------
+   El segundo número es el protagonista, así que va con más peso y con el color
+   del texto principal; el primero queda en gris de apoyo. Los tres estados los
+   pinta `data-state`, que escribe counter.js: el atributo que decide el color
+   y el que describe el estado son el mismo, y no pueden desincronizarse. */
+.counter {
+  @apply flex flex-wrap items-baseline gap-x-2 gap-y-1 font-body-sm text-body-sm;
+}
+
+.counter-plain {
+  @apply text-outline;
+}
+
+.counter-separator {
+  @apply text-outline-variant;
+}
+
+.counter-styled {
+  @apply font-semibold text-on-surface;
+}
+
+.counter[data-state="warning"] .counter-styled {
+  @apply text-secondary;
+}
+
+.counter[data-state="error"] .counter-styled {
+  @apply text-error;
+}
+
+.counter-hint {
+  @apply mt-2 font-body-sm text-body-sm text-on-surface-variant;
+}
+
+.counter[data-state="error"] + .counter-hint {
+  @apply text-error;
+}
+
+/* --- Casilla del panel lateral (S05, ADR-018) ---------------------------- */
+.checkbox-field {
+  @apply flex cursor-pointer items-start gap-3;
+}
+
+.checkbox-control {
+  @apply mt-0.5 h-4 w-4 shrink-0 rounded border-outline-variant text-primary
+    focus:ring-primary;
+}
+
+.checkbox-label {
+  @apply block font-body-sm text-body-sm text-on-surface;
+}
+
+.checkbox-description {
+  @apply mt-1 block font-body-sm text-body-sm text-outline;
+}
+
+.checkbox-note {
+  @apply mt-1 block font-label-sm text-label-sm text-secondary;
+}
+
+/* --- Copia manual: el tercer camino del portapapeles (S05, B-14) ---------
+   No es un mensaje de error. Es el texto correcto, ya seleccionado, con la
+   instrucción de llevárselo a mano. */
+.manual-copy {
+  @apply flex flex-col gap-2 rounded-lg border border-outline-variant
+    bg-surface-container-low p-4;
+}
+
+.manual-copy-label {
+  @apply font-label-md text-label-md text-on-surface-variant;
+}
+
+.manual-copy-field {
+  @apply w-full resize-y rounded-md border border-outline-variant
+    bg-surface-container-lowest p-3 font-body-sm text-body-sm text-on-surface;
+}
+
+/* --- Hashtags y menciones dentro del editor (S05, B-17, ADR-013) ---------
+   No van a recibir formato Unicode al copiar, así que el editor lo enseña
+   antes: si se vieran en negrita y salieran en redonda, el usuario descubriría
+   la diferencia al pegar en LinkedIn y pensaría que el producto falla.
+
+   El span va por dentro de <strong> y <em>, que siguen en el DOM para que
+   `readModelFromDom` recupere el rango (ver la cabecera de render.js). Por eso
+   aquí hay que **neutralizar** lo heredado en vez de no aplicarlo.
+
+   Límite conocido: `text-decoration` de un ancestro se dibuja sobre todos sus
+   descendientes y no se puede cancelar desde dentro, así que la línea de <u> y
+   <s> sigue cruzando el hashtag. Cancelarla exigiría `display: inline-block`,
+   que dentro de un contenteditable trae sus propios problemas al colocar el
+   cursor en los bordes. La pista es discreta a propósito; no hace falta que sea
+   exhaustiva. */
+.protected {
+  @apply text-primary;
+  font-weight: 400;
+  font-style: normal;
+}
+
 /* =========================================================================
    4. UTILIDADES
    ========================================================================= */
@@ -306,6 +431,18 @@ body {
 
 .no-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+/* El <textarea> del camino heredado del portapapeles (S05, clipboard.js).
+   No puede ocultarse con `hidden` ni con `display: none`: un elemento sin caja
+   no se puede seleccionar, y `execCommand("copy")` copia justamente la
+   selección. Se aparta de la pantalla en lugar de esconderlo. */
+.offscreen-field {
+  position: fixed;
+  top: 0;
+  left: -9999px;
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* Respeta el área segura de los dispositivos con notch. */

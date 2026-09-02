@@ -12,8 +12,7 @@
  * pueden solaparse parcialmente y el HTML no admite etiquetas cruzadas: no
  * existe `<strong>uno <em>dos</strong> tres</em>`.
  *
- * La salida se construye recorriendo las **fronteras** de todos los rangos —el
- * `start` y el `end` de cada uno, más el principio y el final del texto— y
+ * La salida se construye recorriendo las **fronteras** de todos los rangos y
  * partiendo el texto por ellas. Entre dos fronteras consecutivas el conjunto de
  * estilos activos no cambia, por definición, así que cada trozo se emite con
  * sus etiquetas anidadas y bien cerradas.
@@ -27,6 +26,31 @@
  * El anidamiento siempre sigue el orden de `STYLES`, de fuera hacia dentro. No
  * cambia lo que se ve, pero hace la salida determinista: dos modelos iguales
  * producen cadenas idénticas, y los tests pueden compararlas literalmente.
+ *
+ * Ese reparto **ya no se calcula aquí**: vive en `segments.js` desde el S05,
+ * porque el serializador necesita exactamente el mismo. Dos implementaciones
+ * separadas acabarían divergiendo, y el día que lo hicieran el usuario copiaría
+ * algo distinto de lo que ve en pantalla.
+ *
+ * ── Hashtags y menciones: se ven, pero no se van a formatear ───────────────
+ *
+ * `#etiqueta` y `@mención` no reciben formato Unicode al copiar (ADR-013), así
+ * que el editor tiene que **avisarlo antes**: si se pintaran en negrita y luego
+ * salieran en redonda, el usuario descubriría la diferencia al pegar en
+ * LinkedIn y pensaría que el producto falla.
+ *
+ * Cada tramo protegido se envuelve en un `<span class="protected">` con su
+ * `title`, y `styles.css` neutraliza ahí la negrita y la cursiva heredadas. La
+ * pista es discreta a propósito: un color y un tooltip, ni iconos ni avisos que
+ * interrumpan la escritura.
+ *
+ * El span va **por dentro** de las etiquetas de estilo, no en su lugar, y eso
+ * es deliberado. El modelo guarda la intención del usuario aunque el motor
+ * decida no honrarla, así que `<strong>` tiene que seguir estando en el DOM
+ * para que `readModelFromDom` recupere el rango: el invariante
+ * `readModelFromDom(render(m)) === m` es lo que sostiene las dos direcciones
+ * del flujo del editor, y no se rompe por una pista visual. Si el usuario borra
+ * la almohadilla, la negrita que ya había pedido aparece sola.
  *
  * ── Etiquetas semánticas ───────────────────────────────────────────────────
  *
@@ -58,7 +82,8 @@
 
 "use strict";
 
-import { STYLES } from "./model.js";
+import { segments } from "./segments.js";
+import { findProtected } from "../export/protect.js";
 
 /**
  * La etiqueta de cada estilo. El orden de anidamiento lo da `STYLES`, no este
@@ -72,6 +97,17 @@ const TAGS = {
 };
 
 /**
+ * El tooltip del tramo protegido. Explica la causa en una frase, que es lo que
+ * el usuario necesita para no pensar que el editor se equivocó.
+ *
+ * Sin comillas ni signos de mayor o menor: va dentro de un atributo, y lo único
+ * que escapa `escapeHtml` es el contenido de elemento.
+ */
+const PROTECTED_TITLE =
+  "Los hashtags y las menciones no reciben formato: LinkedIn dejaría de " +
+  "reconocerlos como enlace.";
+
+/**
  * Modelo → HTML.
  *
  * @param {import("./model.js").Model} model
@@ -81,53 +117,27 @@ export function render(model) {
   const text = model.text ?? "";
   if (text === "") return "";
 
-  const ranges = (model.ranges ?? []).filter((range) => range.start < range.end);
+  const ranges = model.ranges ?? [];
   let html = "";
 
-  for (const { start, end } of segments(text.length, ranges)) {
-    const active = STYLES.filter((style) =>
-      ranges.some(
-        (range) =>
-          range.style === style && range.start <= start && range.end >= end,
-      ),
-    );
-
-    const open = active.map((style) => `<${TAGS[style]}>`).join("");
-    const close = active
+  for (const segment of segments(text.length, ranges, findProtected(text))) {
+    const open = segment.styles.map((style) => `<${TAGS[style]}>`).join("");
+    const close = segment.styles
       .map((style) => `</${TAGS[style]}>`)
       .reverse()
       .join("");
 
-    html += open + escapeHtml(text.slice(start, end)) + close;
+    const chunk = escapeHtml(text.slice(segment.start, segment.end));
+    const body = segment.protected
+      ? `<span class="protected" title="${PROTECTED_TITLE}">${chunk}</span>`
+      : chunk;
+
+    html += open + body + close;
   }
 
   // Ver la cabecera: sin este relleno, la línea vacía que deja un Enter final
   // no tiene altura y el cursor no puede colocarse en ella.
   return text.endsWith("\n") ? `${html}<br>` : html;
-}
-
-/**
- * Parte `[0, length)` por las fronteras de los rangos. Devuelve tramos
- * contiguos, sin huecos y sin solapes, cada uno con un conjunto de estilos
- * constante.
- *
- * @param {number} length
- * @param {import("./model.js").Range[]} ranges
- * @returns {{ start: number, end: number }[]}
- */
-function segments(length, ranges) {
-  const boundaries = new Set([0, length]);
-  for (const range of ranges) {
-    if (range.start > 0 && range.start < length) boundaries.add(range.start);
-    if (range.end > 0 && range.end < length) boundaries.add(range.end);
-  }
-
-  const puntos = [...boundaries].sort((a, b) => a - b);
-  const tramos = [];
-  for (let i = 0; i < puntos.length - 1; i += 1) {
-    tramos.push({ start: puntos[i], end: puntos[i + 1] });
-  }
-  return tramos;
 }
 
 /**

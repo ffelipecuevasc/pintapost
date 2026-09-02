@@ -144,13 +144,30 @@
                          data-placeholder="¿De qué quieres hablar? Empieza a escribir tu post aquí..."></div>
                 </div>
             </section>
-            <!-- Pie de acciones -->
-            <div class="flex justify-end pt-4">
-                <button class="flex items-center gap-2 bg-primary text-on-primary px-8 py-3 rounded-lg font-label-md text-label-md hover:brightness-110 shadow-sm transition-all active:scale-95"
-                        type="button">
-                    <svg class="w-5 h-5" aria-hidden="true"><use href="/static/assets/icons.svg#copy"></use></svg>
-                    Copiar para LinkedIn
-                </button>
+            <!-- Pie de acciones (S05, B-13/B-14/B-15) -->
+            <div class="flex flex-col gap-3 pt-4">
+                <div class="flex flex-col sm:flex-row sm:justify-end items-stretch sm:items-center gap-3">
+                    <button class="button-secondary" type="button" id="copy-plain">
+                        <svg class="w-5 h-5" aria-hidden="true"><use href="/static/assets/icons.svg#copy"></use></svg>
+                        <span data-label>Copiar sin formato</span>
+                    </button>
+                    <button class="button-primary" type="button" id="copy-styled">
+                        <svg class="w-5 h-5" aria-hidden="true"><use href="/static/assets/icons.svg#copy"></use></svg>
+                        <span data-label>Copiar para LinkedIn</span>
+                    </button>
+                </div>
+                <!-- El aviso completo de accesibilidad es del S06; aquí basta
+                     con que la opción exista y se entienda. -->
+                <p class="font-body-sm text-body-sm text-outline sm:text-right">
+                    &laquo;Copiar sin formato&raquo; te da tu texto original. Los lectores de pantalla no leen
+                    bien el texto con formato y el buscador de LinkedIn no lo indexa.
+                </p>
+                <!-- Camino 3 del portapapeles: nunca un error sin salida. -->
+                <div class="manual-copy" id="copy-manual" hidden>
+                    <label class="manual-copy-label" for="copy-manual-field">Mantén pulsado y elige Copiar</label>
+                    <textarea class="manual-copy-field" id="copy-manual-field" readonly rows="4"></textarea>
+                </div>
+                <p class="sr-only" id="copy-status" role="status" aria-live="polite"></p>
             </div>
         </div>
     </main>
@@ -166,9 +183,32 @@
                 <svg class="w-5 h-5 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true"><use href="/static/assets/icons.svg#chevron-down"></use></svg>
             </summary>
             <div class="flex flex-col gap-8 px-margin-mobile pb-6 md:p-6">
+                <!-- Contador dual (S05, B-16, ADR-012). El segundo número es
+                     el protagonista: es el que cuenta LinkedIn. `data-state`
+                     lo pinta styles.css en sus tres estados. -->
                 <section>
                     <h2 class="text-label-sm font-label-sm text-outline uppercase tracking-wider mb-2">Caracteres</h2>
-                    <p class="font-body-sm text-body-sm text-outline">Contará el texto plano y el que acaba pegado en LinkedIn.</p>
+                    <p class="counter" id="counter" data-state="normal">
+                        <span class="counter-plain" id="counter-plain">0 caracteres</span>
+                        <span class="counter-separator" aria-hidden="true">&middot;</span>
+                        <span class="counter-styled" id="counter-styled">0 / 3.000 en LinkedIn</span>
+                    </p>
+                    <p class="counter-hint" id="counter-hint" hidden></p>
+                    <p class="sr-only" id="counter-status" role="status" aria-live="polite"></p>
+                </section>
+                <!-- Máxima compatibilidad (S05, ADR-018). Desactivada por
+                     defecto: el estilo compuesto sigue siendo el normal. -->
+                <section>
+                    <h2 class="text-label-sm font-label-sm text-outline uppercase tracking-wider mb-2">Compatibilidad</h2>
+                    <label class="checkbox-field" for="compat-toggle">
+                        <input class="checkbox-control" id="compat-toggle" type="checkbox"
+                               aria-describedby="compat-description"/>
+                        <span>
+                            <span class="checkbox-label">Máxima compatibilidad</span>
+                            <span class="checkbox-description" id="compat-description">No dar formato a las letras con tilde. Se ven mejor en algunos navegadores y ocupan menos caracteres.</span>
+                            <span class="checkbox-note" id="compat-savings" hidden></span>
+                        </span>
+                    </label>
                 </section>
                 <section>
                     <h2 class="text-label-sm font-label-sm text-outline uppercase tracking-wider mb-2">Borradores</h2>
