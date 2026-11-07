@@ -55,8 +55,3 @@ $RECYCLE.BIN/
 *.bak
 *.swp
 *~
-
-# =========================================
-# 6. Espacio de trabajo local (no se publica)
-# =========================================
-_workspace/
